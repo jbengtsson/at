@@ -1,6 +1,6 @@
 
-#include "atelem.c"
-#include "atlalib.c"
+#include "atelem.cc"
+#include "atlalib.cc"
 
 struct elem 
 {
@@ -56,12 +56,14 @@ ExportMode struct elem *trackFunction(const atElem *ElemData,struct elem *Elem,
             double Length;
             double *R1, *R2, *T1, *T2, *EApertures, *RApertures;
             Length=atGetDouble(ElemData,"Length"); check_error();
-            R1=atGetOptionalDoubleArray(ElemData,"R1"); check_error();
-            R2=atGetOptionalDoubleArray(ElemData,"R2"); check_error();
-            T1=atGetOptionalDoubleArray(ElemData,"T1"); check_error();
-            T2=atGetOptionalDoubleArray(ElemData,"T2"); check_error();
-            EApertures=atGetOptionalDoubleArray(ElemData,"EApertures"); check_error();
-            RApertures=atGetOptionalDoubleArray(ElemData,"RApertures"); check_error();
+            R1=atGetOptionalDoubleArray(ElemData, (char*)"R1"); check_error();
+            R2=atGetOptionalDoubleArray(ElemData, (char*)"R2"); check_error();
+            T1=atGetOptionalDoubleArray(ElemData, (char*)"T1"); check_error();
+            T2=atGetOptionalDoubleArray(ElemData, (char*)"T2"); check_error();
+            EApertures=atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
+	    check_error();
+            RApertures=atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
+	    check_error();
             Elem = (struct elem*)atMalloc(sizeof(struct elem));
             Elem->Length=Length;
             Elem->R1=R1;

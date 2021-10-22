@@ -29,7 +29,9 @@ here = abspath(dirname(__file__))
 macros = [('PYAT', None)]
 with_openMP = False
 
-cflags = []
+#cflags = []
+cflags = ['-std=gnu++14']
+lflags = ['-L/usr/local/Cellar/armadillo/10.6.2/lib', '-larmadillo']
 
 omp = os.environ.get('OPENMP', None)
 if omp is None:
@@ -75,7 +77,7 @@ with open(join(here, 'README.rst'), encoding='utf-8') as f:
 # this file is executed each time any setup.py command is run.
 # It appears that only copying the files when they are available is
 # sufficient.
-at_source = abspath(join(here, 'at.c'))
+at_source = abspath(join(here, 'at.cc'))
 integrator_src_orig = abspath(join(here, '..', 'atintegrators'))
 integrator_src = abspath(join(here, 'integrator-src'))
 diffmatrix_source = abspath(
@@ -87,7 +89,7 @@ if exists(integrator_src_orig):
     source_files = glob.glob(join(integrator_src_orig, '*.[ch]'))
     source_files.extend(glob.glob(join(integrator_src_orig, '*.cc')))
     source_files.extend(
-        glob.glob(join(diffmatrix_source, 'findmpoleraddiffmatrix.c'))
+        glob.glob(join(diffmatrix_source, 'findmpoleraddiffmatrix.cc'))
     )
     if not exists(integrator_src):
         os.makedirs(integrator_src)
@@ -96,7 +98,7 @@ if exists(integrator_src_orig):
 
 pass_methods = glob.glob(join(integrator_src, '*Pass.c'))
 pass_methods.extend(glob.glob(join(integrator_src, '*Pass.cc')))
-diffmatrix_method = join(integrator_src, 'findmpoleraddiffmatrix.c')
+diffmatrix_method = join(integrator_src, 'findmpoleraddiffmatrix.cc')
 
 
 def integrator_ext(pass_method):

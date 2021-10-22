@@ -10,8 +10,8 @@
    radiation integrals', Phys.Rev.E  Vol.49 p.751 (1994)
 */
 
-#include "atelem.c"
-#include "atlalib.c"
+#include "atelem.cc"
+#include "atlalib.cc"
 
 /* Fourth order-symplectic integrator constants */
 
@@ -445,8 +445,8 @@ static double *diffmatrix(const atElem *ElemData, double *orb, double energy, do
     Length=atGetOptionalDouble(ElemData,"Length", 0.0);
 	/* If ELEMENT has a zero length, return zeros matrix end exit */
 	if (Length == 0.0) return bdiff;
-    PolynomA=atGetOptionalDoubleArray(ElemData,"PolynomA");
-    PolynomB=atGetOptionalDoubleArray(ElemData,"PolynomB");
+    PolynomA=atGetOptionalDoubleArray(ElemData, (char*)"PolynomA");
+    PolynomB=atGetOptionalDoubleArray(ElemData, (char*)"PolynomB");
 	/* If the ELEMENT does not have PolynomA and PolynomB return zero matrix and  exit */
 	if (PolynomA == NULL ||  PolynomB == NULL) return bdiff;
 
@@ -464,10 +464,10 @@ static double *diffmatrix(const atElem *ElemData, double *orb, double energy, do
     FullGap=atGetOptionalDouble(ElemData,"FullGap",0); check_error();
     FringeInt1=atGetOptionalDouble(ElemData,"FringeInt1",0); check_error();
     FringeInt2=atGetOptionalDouble(ElemData,"FringeInt2",0); check_error();
-    R1=atGetOptionalDoubleArray(ElemData,"R1"); check_error();
-    R2=atGetOptionalDoubleArray(ElemData,"R2"); check_error();
-    T1=atGetOptionalDoubleArray(ElemData,"T1"); check_error();
-    T2=atGetOptionalDoubleArray(ElemData,"T2"); check_error();
+    R1=atGetOptionalDoubleArray(ElemData, (char*)"R1"); check_error();
+    R2=atGetOptionalDoubleArray(ElemData, (char*)"R2"); check_error();
+    T1=atGetOptionalDoubleArray(ElemData, (char*)"T1"); check_error();
+    T2=atGetOptionalDoubleArray(ElemData, (char*)"T2"); check_error();
 
 	FindElemB(orb, Length, irho, PolynomA, PolynomB, 
             T1, T2, R1, R2,
@@ -557,13 +557,14 @@ static PyObject *compute_diffmatrix(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    orb0 = PyArray_DATA(pyOrbit);
+    // C -> C++.
+    orb0 = static_cast<double*>(PyArray_DATA(pyOrbit));
 	/* make local copy of the input closed orbit vector */
 	for (i=0;i<6;i++) orb[i] = orb0[i];
 
 	/* ALLOCATE memory for the output array */
     pyMatrix = PyArray_ZEROS(2, outdims, NPY_DOUBLE, 1);
-    bdiff = PyArray_DATA((PyArrayObject *)pyMatrix);
+    bdiff = static_cast<double*>(PyArray_DATA((PyArrayObject *)pyMatrix));
 
     retval = diffmatrix(pyElem, orb, energy, bdiff);
     if (retval == NULL) {

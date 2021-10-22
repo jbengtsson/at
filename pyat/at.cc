@@ -293,8 +293,16 @@ static struct LibraryListElement* get_track_function(const char *fn_name) {
             return NULL;
         }
 
-        LibraryListPtr = (struct LibraryListElement *)malloc(sizeof(struct LibraryListElement));
-        LibraryListPtr->MethodName = strcpy(malloc(strlen(fn_name)+1), fn_name);
+	// C -> C++.
+        LibraryListPtr =
+	  // (struct LibraryListElement *)
+	  // malloc(sizeof(struct LibraryListElement));
+ 	  static_cast<struct LibraryListElement*>
+	  (malloc(sizeof(struct LibraryListElement)));
+	// LibraryListPtr->MethodName =
+	//   strcpy(malloc(strlen(fn_name)+1), fn_name);
+	LibraryListPtr->MethodName =
+	  strcpy(static_cast<char*>(malloc(strlen(fn_name)+1)), fn_name);
         LibraryListPtr->LibraryHandle = dl_handle;
         LibraryListPtr->FunctionHandle = fn_handle;
         LibraryListPtr->PyFunctionHandle = pyfunction;
@@ -314,7 +322,12 @@ static struct LibraryListElement* get_track_function(const char *fn_name) {
  *  - reuse: whether to reuse the cached state of the ring
  */
 static PyObject *at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
-    static char *kwlist[] = {"line","rin","nturns","refpts","reuse","omp_num_threads","losses", NULL};
+    // C -> C++.
+    static char
+      *kwlist[] =
+      {(char*)"line", (char*)"rin", (char*)"nturns", (char*)"refpts",
+       (char*)"reuse", (char*)"omp_num_threads", (char*)"losses",
+       (char*)NULL};
     static double lattice_length = 0.0;
     static int valid = 0;
 
@@ -352,8 +365,10 @@ static PyObject *at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     struct LibraryListElement *LibraryListPtr;
 
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!i|O!III", kwlist, &PyList_Type, &lattice,
-        &PyArray_Type, &rin, &num_turns, &PyArray_Type, &refs, &keep_lattice, &omp_num_threads, &losses)) {
+    if (!PyArg_ParseTupleAndKeywords
+	(args, kwargs, "O!O!i|O!III", kwlist, &PyList_Type, &lattice,
+	 &PyArray_Type, &rin, &num_turns, &PyArray_Type, &refs, &keep_lattice,
+	 &omp_num_threads, &losses)) {
         return NULL;
     }
     if (PyArray_DIM(rin,0) != 6) {
@@ -371,14 +386,16 @@ static PyObject *at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
 
     num_particles = (PyArray_SIZE(rin)/6);
     np6 = num_particles*6;
-    drin = PyArray_DATA(rin);
+    // C -> C++.
+    drin = static_cast<double *>(PyArray_DATA(rin));
 
     if (refs) {
         if (PyArray_TYPE(refs) != NPY_UINT32) {
             PyErr_SetString(PyExc_ValueError, "refpts is not a uint32 array");
             return NULL;
         }
-        refpts = PyArray_DATA(refs);
+	// C -> C++.
+        refpts = static_cast<unsigned int*>(PyArray_DATA(refs));
         num_refpts = PyArray_SIZE(refs);
     }
     else {
@@ -390,7 +407,8 @@ static PyObject *at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     outdims[2] = num_refpts;
     outdims[3] = num_turns;
     rout = PyArray_EMPTY(4, outdims, NPY_DOUBLE, 1);
-    drout = PyArray_DATA((PyArrayObject *)rout);
+    // C -> C++.
+    drout = static_cast<double*>(PyArray_DATA((PyArrayObject *)rout));
 
     if(losses){
         pdims[0]= num_particles;
@@ -400,10 +418,12 @@ static PyObject *at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
         xnelem = PyArray_EMPTY(1, pdims, NPY_UINT32, 1);
         xlost = PyArray_EMPTY(1, pdims, NPY_BOOL, 1);
         xlostcoord = PyArray_EMPTY(2, lxdims, NPY_DOUBLE, 1);
-        ixnturn = PyArray_DATA((PyArrayObject *)xnturn);
-        ixnelem = PyArray_DATA((PyArrayObject *)xnelem);
-        bxlost = PyArray_DATA((PyArrayObject *)xlost);
-        dxlostcoord = PyArray_DATA((PyArrayObject *)xlostcoord);
+	// C -> C++.
+        ixnturn = static_cast<int*>(PyArray_DATA((PyArrayObject *)xnturn));
+        ixnelem = static_cast<int*>(PyArray_DATA((PyArrayObject *)xnelem));
+        bxlost = static_cast<bool*>(PyArray_DATA((PyArrayObject *)xlost));
+        dxlostcoord =
+	  static_cast<double*>(PyArray_DATA((PyArrayObject *)xlostcoord));
         unsigned int i;
         static double r0[6];
         for(i=0;i<num_particles;i++){
@@ -573,7 +593,8 @@ static PyObject *at_elempass(PyObject *self, PyObject *args)
         return set_error(PyExc_ValueError, "rin is not Fortran-aligned");
     }
     num_particles = (PyArray_SIZE(rin)/6);
-    drin = PyArray_DATA(rin);
+    // C -> C++.
+    drin = static_cast<double*>(PyArray_DATA(rin));
 
     param.RingLength = 0.0;
     param.T0 = 0.0;
