@@ -128,24 +128,7 @@ if False:
 
 #example(sup_per)
 
-#get_optics(sup_per, False)
-
-if False:
-    print('\n', inspect.signature(at.find_orbit))
-
-Dr = at.Drift('Dr', 0.5)
-Qd = at.Quadrupole('QD', 0.5, -1.2)
-Bd = at.Dipole('Bend', 1, 2*np.pi/40)
-Id = at.Marker('Mk')
-lat = at.Lattice([Dr, Qd, Bd, Id], name='', energy=1e9)
-print('\n', lat)
-for elem in lat:
-    print(elem)
-
-ps = np.array([1e-3, -1e-3, 0e0, 0e0, 0e0, 0e0])
-prt_ps('Track:\n', ps)
-at.lattice_pass(lat, ps, 1)
-prt_ps('', ps)
+get_optics(sup_per, False)
 
 
 # AT Interface
