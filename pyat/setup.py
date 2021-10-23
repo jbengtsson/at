@@ -96,9 +96,9 @@ if exists(integrator_src_orig):
     for f in source_files:
         shutil.copy2(f, integrator_src)
 
-pass_methods = glob.glob(join(integrator_src, '*Pass.c'))
-pass_methods.extend(glob.glob(join(integrator_src, '*Pass.cc')))
+pass_methods = glob.glob(join(integrator_src, '*Pass.cc'))
 diffmatrix_method = join(integrator_src, 'findmpoleraddiffmatrix.cc')
+print('\npass_methods: ', pass_methods)
 
 
 def integrator_ext(pass_method):
@@ -110,7 +110,7 @@ def integrator_ext(pass_method):
         include_dirs=[numpy.get_include(), integrator_src, diffmatrix_source],
         define_macros=macros + omp_macros,
         extra_compile_args=cflags + omp_cflags,
-        extra_link_args=omp_lflags
+        extra_link_args=lflags + omp_lflags
     )
 
 

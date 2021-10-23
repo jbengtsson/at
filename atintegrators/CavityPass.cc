@@ -61,8 +61,9 @@ void CavityPass(double *r_in, double le, double nv, double freq, double lag, int
 
 
 #if defined(MATLAB_MEX_FILE) || defined(PYAT)
-ExportMode struct elem *trackFunction(const atElem *ElemData,struct elem *Elem,
-        double *r_in, int num_particles, struct parameters *Param)
+ExportMode struct elem*
+trackFunction(const atElem *ElemData,struct elem *Elem,
+	      double *r_in, int num_particles, struct parameters *Param)
 {
     if (!Elem) {
         double Length, Voltage, Energy, Frequency, TimeLag;

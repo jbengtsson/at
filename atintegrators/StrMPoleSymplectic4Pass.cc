@@ -110,8 +110,9 @@ void StrMPoleSymplectic4Pass(double *r, double le, double *A, double *B,
 }
 
 #if defined(MATLAB_MEX_FILE) || defined(PYAT)
-ExportMode struct elem *trackFunction(const atElem *ElemData,struct elem *Elem,
-        double *r_in, int num_particles, struct parameters *Param)
+ExportMode struct elem*
+trackFunction(const atElem *ElemData,struct elem *Elem,
+	      double *r_in, int num_particles, struct parameters *Param)
 {
     if (!Elem) {
         double Length;

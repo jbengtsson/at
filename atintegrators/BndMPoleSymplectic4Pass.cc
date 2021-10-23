@@ -1,8 +1,8 @@
-#include "atelem.c"
-#include "atlalib.c"
-#include "atphyslib.c"
-#include "driftkick.c"		/* fastdrift and bndthinkick */
-#include "quadfringe.c"		/* QuadFringePassP, QuadFringePassN */
+#include "atelem.cc"
+#include "atlalib.cc"
+#include "atphyslib.cc"
+#include "driftkick.cc"		/* fastdrift and bndthinkick */
+#include "quadfringe.cc"	/* QuadFringePassP, QuadFringePassN */
 
 #define DRIFT1    0.6756035959798286638
 #define DRIFT2   -0.1756035959798286639
@@ -132,8 +132,9 @@ void BndMPoleSymplectic4Pass(double *r, double le, double irho, double *A, doubl
 
 
 #if defined(MATLAB_MEX_FILE) || defined(PYAT)
-ExportMode struct elem *trackFunction(const atElem *ElemData,struct elem *Elem,
-			      double *r_in, int num_particles, struct parameters *Param)
+ExportMode struct elem*
+trackFunction(const atElem *ElemData,struct elem *Elem,
+	      double *r_in, int num_particles, struct parameters *Param)
 {
     double irho;
     if (!Elem) {
@@ -143,30 +144,30 @@ ExportMode struct elem *trackFunction(const atElem *ElemData,struct elem *Elem,
                 FringeQuadEntrance, FringeQuadExit;
         double *PolynomA, *PolynomB, *R1, *R2, *T1, *T2, *EApertures, *RApertures, *fringeIntM0, *fringeIntP0, *KickAngle;
         Length=atGetDouble(ElemData,"Length"); check_error();
-        PolynomA=atGetDoubleArray(ElemData,"PolynomA"); check_error();
-        PolynomB=atGetDoubleArray(ElemData,"PolynomB"); check_error();
-        MaxOrder=atGetLong(ElemData,"MaxOrder"); check_error();
-        NumIntSteps=atGetLong(ElemData,"NumIntSteps"); check_error();
-        BendingAngle=atGetDouble(ElemData,"BendingAngle"); check_error();
-        EntranceAngle=atGetDouble(ElemData,"EntranceAngle"); check_error();
-        ExitAngle=atGetDouble(ElemData,"ExitAngle"); check_error();
+        PolynomA=atGetDoubleArray(ElemData,(char*)"PolynomA"); check_error();
+        PolynomB=atGetDoubleArray(ElemData,(char*)"PolynomB"); check_error();
+        MaxOrder=atGetLong(ElemData,(char*)"MaxOrder"); check_error();
+        NumIntSteps=atGetLong(ElemData,(char*)"NumIntSteps"); check_error();
+        BendingAngle=atGetDouble(ElemData,(char*)"BendingAngle"); check_error();
+        EntranceAngle=atGetDouble(ElemData,(char*)"EntranceAngle"); check_error();
+        ExitAngle=atGetDouble(ElemData,(char*)(char*)"ExitAngle"); check_error();
         /*optional fields*/
-        FringeBendEntrance=atGetOptionalLong(ElemData,"FringeBendEntrance",1); check_error();
-        FringeBendExit=atGetOptionalLong(ElemData,"FringeBendExit",1); check_error();
-        FullGap=atGetOptionalDouble(ElemData,"FullGap",0); check_error();
-        FringeInt1=atGetOptionalDouble(ElemData,"FringeInt1",0); check_error();
-        FringeInt2=atGetOptionalDouble(ElemData,"FringeInt2",0); check_error();
-        FringeQuadEntrance=atGetOptionalLong(ElemData,"FringeQuadEntrance",0); check_error();
-        FringeQuadExit=atGetOptionalLong(ElemData,"FringeQuadExit",0); check_error();
-        fringeIntM0=atGetOptionalDoubleArray(ElemData,"fringeIntM0"); check_error();
-        fringeIntP0=atGetOptionalDoubleArray(ElemData,"fringeIntP0"); check_error();
-        R1=atGetOptionalDoubleArray(ElemData,"R1"); check_error();
-        R2=atGetOptionalDoubleArray(ElemData,"R2"); check_error();
-        T1=atGetOptionalDoubleArray(ElemData,"T1"); check_error();
-        T2=atGetOptionalDoubleArray(ElemData,"T2"); check_error();
-        EApertures=atGetOptionalDoubleArray(ElemData,"EApertures"); check_error();
-        RApertures=atGetOptionalDoubleArray(ElemData,"RApertures"); check_error();
-        KickAngle=atGetOptionalDoubleArray(ElemData,"KickAngle"); check_error();
+        FringeBendEntrance=atGetOptionalLong(ElemData,(char*)"FringeBendEntrance",1); check_error();
+        FringeBendExit=atGetOptionalLong(ElemData,(char*)"FringeBendExit",1); check_error();
+        FullGap=atGetOptionalDouble(ElemData,(char*)"FullGap",0); check_error();
+        FringeInt1=atGetOptionalDouble(ElemData,(char*)"FringeInt1",0); check_error();
+        FringeInt2=atGetOptionalDouble(ElemData,(char*)"FringeInt2",0); check_error();
+        FringeQuadEntrance=atGetOptionalLong(ElemData,(char*)"FringeQuadEntrance",0); check_error();
+        FringeQuadExit=atGetOptionalLong(ElemData,(char*)"FringeQuadExit",0); check_error();
+        fringeIntM0=atGetOptionalDoubleArray(ElemData,(char*)"fringeIntM0"); check_error();
+        fringeIntP0=atGetOptionalDoubleArray(ElemData,(char*)"fringeIntP0"); check_error();
+        R1=atGetOptionalDoubleArray(ElemData,(char*)"R1"); check_error();
+        R2=atGetOptionalDoubleArray(ElemData,(char*)"R2"); check_error();
+        T1=atGetOptionalDoubleArray(ElemData,(char*)"T1"); check_error();
+        T2=atGetOptionalDoubleArray(ElemData,(char*)"T2"); check_error();
+        EApertures=atGetOptionalDoubleArray(ElemData,(char*)"EApertures"); check_error();
+        RApertures=atGetOptionalDoubleArray(ElemData,(char*)"RApertures"); check_error();
+        KickAngle=atGetOptionalDoubleArray(ElemData,(char*)"KickAngle"); check_error();
         
         Elem = (struct elem*)atMalloc(sizeof(struct elem));
         Elem->Length=Length;
