@@ -25,8 +25,8 @@ static void edge_fringe_entrance(double* r, double inv_rho, double edge_angle,
     if ((fint==0.0) || (gap==0.0) || (method==0))
         fringecorr = 0.0;
     else {
-        register double sedge = sin(edge_angle);
-        register double cedge = cos(edge_angle);
+        double sedge = sin(edge_angle);
+        double cedge = cos(edge_angle);
         fringecorr = inv_rho*gap*fint*(1+sedge*sedge)/cedge;
     }
     
@@ -58,8 +58,8 @@ static void edge_fringe_exit(double* r, double inv_rho, double edge_angle,
     if ((fint==0.0) || (gap==0.0) || (method==0))
         fringecorr = 0.0;
     else {
-        register double sedge = sin(edge_angle);
-        register double cedge = cos(edge_angle);
+        double sedge = sin(edge_angle);
+        double cedge = cos(edge_angle);
         fringecorr = inv_rho*gap*fint*(1+sedge*sedge)/cedge;
     }
     

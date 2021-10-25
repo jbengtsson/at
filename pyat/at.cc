@@ -1,13 +1,14 @@
 /*
- * This file contains the Python interface to AT, compatible with
- * Python 3 only. It provides a module 'atpass' containing one method 'atpass'.
- */
+   This file contains the Python interface to AT, compatible with Python 3 only.
+   It provides a module 'atpass' containing one method 'atpass'.
+                                                                              */
+
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <stdarg.h>
 #ifdef _OPENMP
-#include <string.h>
-#include <omp.h>
+  #include <string.h>
+  #include <omp.h>
 #endif /*_OPENMP*/
 #include "attypes.h"
 #include <stdbool.h> 
@@ -25,29 +26,29 @@ typedef PyObject atElem;
 #define ATPY_PASS "trackFunction"
 
 #if defined(PCWIN) || defined(PCWIN64) || defined(_WIN32)
-#include <windows.h>
-#define LIBRARYHANDLETYPE HINSTANCE
-#define FREELIBFCN(libfilename) FreeLibrary((libfilename))
-#define LOADLIBFCN(libfilename) LoadLibrary((libfilename))
-#define GETTRACKFCN(libfilename) GetProcAddress((libfilename),ATPY_PASS)
-#define SEPARATOR "\\"
-#define OBJECTEXT ".pyd"
+  #include <windows.h>
+  #define LIBRARYHANDLETYPE HINSTANCE
+  #define FREELIBFCN(libfilename) FreeLibrary((libfilename))
+  #define LOADLIBFCN(libfilename) LoadLibrary((libfilename))
+  #define GETTRACKFCN(libfilename) GetProcAddress((libfilename),ATPY_PASS)
+  #define SEPARATOR "\\"
+  #define OBJECTEXT ".pyd"
 #else
-#include <dlfcn.h>
-#define LIBRARYHANDLETYPE void *
-#define FREELIBFCN(libfilename) dlclose(libfilename)
-#define LOADLIBFCN(libfilename) dlopen((libfilename),RTLD_LAZY)
-#define GETTRACKFCN(libfilename) dlsym((libfilename),ATPY_PASS)
-#define SEPARATOR "/"
-#define OBJECTEXT ".so"
+  #include <dlfcn.h>
+  #define LIBRARYHANDLETYPE void *
+  #define FREELIBFCN(libfilename) dlclose(libfilename)
+  #define LOADLIBFCN(libfilename) dlopen((libfilename),RTLD_LAZY)
+  #define GETTRACKFCN(libfilename) dlsym((libfilename),ATPY_PASS)
+  #define SEPARATOR "/"
+  #define OBJECTEXT ".so"
 #endif
 
 #define LIMIT_AMPLITUDE		1
 
 /* define the general signature of a pass function */
-typedef struct elem
-  *(*track_function)(const PyObject *element, struct elem *elemptr,
-		     double *r_in, int num_particles, struct parameters *param);
+typedef struct elem*
+(*track_function)(const PyObject *element, struct elem *elemptr, double *r_in,
+		  int num_particles, struct parameters *param);
 
 static npy_uint32     num_elements = 0;
 static struct elem    **elemdata_list = NULL;
@@ -84,6 +85,7 @@ static PyObject *set_error(PyObject *errtype, const char *fmt, ...)
   va_end(ap);
   return NULL;
 }
+
 /*
  * Recursively search the list to check if the library containing
  * method_name is already loaded. If it is - return the pointer to the
@@ -156,6 +158,7 @@ static void setlost(double *drin, npy_uint32 np)
  */
 static PyObject* get_integrators(void) {
   PyObject *at_module, *os_module, *fileobj, *dirname_function, *dirobj;
+
   at_module = PyImport_ImportModule("at.integrators");
   if (at_module == NULL) return NULL;
   fileobj = PyObject_GetAttrString(at_module, "__file__");
@@ -179,6 +182,7 @@ static PyObject* get_integrators(void) {
  */
 static PyObject* get_ext_suffix(void) {
   PyObject *sysconfig_module, *get_config_var_fn, *ext_suffix;
+
   sysconfig_module = PyImport_ImportModule("distutils.sysconfig");
   if (sysconfig_module == NULL) return NULL;
   get_config_var_fn =
@@ -190,17 +194,18 @@ static PyObject* get_ext_suffix(void) {
   return ext_suffix;
 }
 
-
 /*
  * Import the python module for python integrators
  * and return the function object
  */
 static PyObject* GetpyFunction(const char *fn_name)
 {
-  char dest[300];
+  char      dest[300];
+  PyObject *pModule;
+
   strcpy(dest,"at.integrators.");
   strcat(dest,fn_name);
-  PyObject *pModule;
+
   pModule = PyImport_ImportModule(fn_name);
   if (!pModule){
     PyErr_Clear();
@@ -227,6 +232,7 @@ static PyObject* GetpyFunction(const char *fn_name)
 static PyObject* Buildkwargs(const atElem *ElemData)
 {
   PyObject *kwargs;
+
   kwargs = PyDict_New();
   PyDict_SetItemString(kwargs,(char *)"elem",(PyObject *)ElemData);
   return kwargs;
@@ -238,8 +244,9 @@ static PyObject* Buildkwargs(const atElem *ElemData)
 static PyObject* Buildargs(double *r_in, int num_particles)
 {
   npy_intp outdims[1];
-  outdims[0] = 6*num_particles;
   PyObject *rin;
+
+  outdims[0] = 6*num_particles;
   rin = PyArray_SimpleNewFromData(1, outdims, NPY_DOUBLE, r_in);
   if (!rin){
     printf("PyFuncPass: could not generate pyArray rin");
@@ -255,6 +262,7 @@ static PyObject
 		  int num_particles)
 {
   PyObject *args;
+
   args = Buildargs(r_in, num_particles);
   PyObject_Call(function, args, kwargs);
   Py_DECREF(args);
@@ -271,9 +279,9 @@ static struct LibraryListElement* get_track_function(const char *fn_name) {
 
   if (!LibraryListPtr) {
     LIBRARYHANDLETYPE dl_handle=NULL;
-    track_function fn_handle = NULL;
-    char lib_file[300], buffer[200];
-    PyObject *pyfunction = NULL;
+    track_function    fn_handle = NULL;
+    char              lib_file[300], buffer[200];
+    PyObject          *pyfunction = NULL;
 
     pyfunction = GetpyFunction(fn_name);
 
@@ -319,13 +327,13 @@ static struct LibraryListElement* get_track_function(const char *fn_name) {
 }
 
 /*
- * Parse the arguments to atpass, set things up, and execute.
- * Arguments:
- *  - line: sequence of elements
- *  - rin: numpy 6-vector of initial conditions
- *  - nturns: int number of turns to simulate
- *  - refpts: numpy uint32 array denoting elements at which to return state
- *  - reuse: whether to reuse the cached state of the ring
+  Parse the arguments to atpass, set things up, and execute.
+  Arguments:
+    line:   sequence of elements
+    rin:    numpy 6-vector of initial conditions
+    nturns: int number of turns to simulate
+    refpts: numpy uint32 array denoting elements at which to return state
+    reuse:  whether to reuse the cached state of the ring
  */
 static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
   // C -> C++.
@@ -335,35 +343,45 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
      (char*)"reuse", (char*)"omp_num_threads", (char*)"losses",
      (char*)NULL};
   static double lattice_length = 0.0;
-  static int valid = 0;
+  static int    valid = 0;
 
-  PyObject *lattice;
-  PyArrayObject *rin;
-  PyArrayObject *refs = NULL;
-  PyObject *rout;
-  double *drin, *drout;
-  PyObject *xnturn = NULL;
-  PyObject *xnelem = NULL;
-  PyObject *xlost = NULL;
-  PyObject *xlostcoord = NULL;
-  int *ixnturn = NULL;
-  int *ixnelem = NULL;
-  bool *bxlost = NULL;
-  double *dxlostcoord = NULL;
-  int num_turns;
-  npy_uint32 omp_num_threads=0;
-  npy_uint32 num_particles, np6;
-  npy_uint32 elem_index;
-  npy_uint32 *refpts = NULL;
-  npy_uint32 nextref;
-  unsigned int nextrefindex;
-  unsigned int num_refpts;
-  npy_uint32 keep_lattice=0;
-  npy_uint32 losses=0;
-  npy_intp outdims[4];
-  npy_intp pdims[1];
-  npy_intp lxdims[2];
-  int turn;
+  PyObject
+    *lattice;
+  PyArrayObject
+    *rin,
+    *refs = NULL;
+  PyObject
+    *rout,
+    *xnturn = NULL,
+    *xnelem = NULL,
+    *xlost = NULL,
+    *xlostcoord = NULL;
+  int
+    turn,
+    *ixnturn = NULL,
+    *ixnelem = NULL,
+    num_turns;
+  bool
+    *bxlost = NULL;
+  double
+    *drin,
+    *drout,
+    *dxlostcoord = NULL;
+  npy_uint32
+    omp_num_threads=0,
+    num_particles, np6,
+    elem_index,
+    *refpts = NULL,
+    nextref,
+    keep_lattice=0,
+    losses=0;
+  unsigned int
+    nextrefindex,
+    num_refpts;
+  npy_intp
+    outdims[4],
+    pdims[1],
+    lxdims[2];
 #ifdef _OPENMP
   int maxthreads;
 #endif /*_OPENMP*/
@@ -440,7 +458,6 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     }
   }
 
-
 #ifdef _OPENMP
   if ((omp_num_threads > 0) && (num_particles > OMP_PARTICLE_THRESHOLD)) {
     unsigned int nthreads = omp_get_num_procs();
@@ -494,7 +511,8 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     for (elem_index = 0; elem_index < num_elements; elem_index++) {
       PyObject *el = PyList_GET_ITEM(lattice, elem_index);
       PyObject *PyPassMethod = PyObject_GetAttrString(el, "PassMethod");
-      double length;
+      double   length;
+
       if (!PyPassMethod)
 	/* No PassMethod */
 	return print_error(elem_index, rout);
@@ -518,11 +536,12 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
   param.RingLength = lattice_length;
   param.T0 = lattice_length/299792458.0;
   for (turn = 0; turn < num_turns; turn++) {
-    PyObject **element = element_list;
+    PyObject       **element = element_list;
     track_function *integrator = integrator_list;
-    PyObject **pyintegrator = pyintegrator_list;
-    PyObject **kwargs = kwargs_list;
-    struct elem **elemdata = elemdata_list;
+    PyObject       **pyintegrator = pyintegrator_list;
+    PyObject       **kwargs = kwargs_list;
+    struct elem    **elemdata = elemdata_list;
+
     param.nturn = turn;
     nextrefindex = 0;
     nextref= (nextrefindex<num_refpts) ? refpts[nextrefindex++] : INT_MAX;
@@ -571,8 +590,10 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
 #endif /*_OPENMP*/
 
   if (losses) {
-    PyObject *tout = PyTuple_New(2);
-    PyObject *dict = PyDict_New();
+    PyObject
+      *tout = PyTuple_New(2),
+      *dict = PyDict_New();
+
     PyDict_SetItemString(dict,(char *)"islost",(PyObject *)xlost);
     PyDict_SetItemString(dict,(char *)"turn",(PyObject *)xnturn); 
     PyDict_SetItemString(dict,(char *)"elem",(PyObject *)xnelem);
@@ -591,15 +612,22 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
 
 static PyObject *at_elempass(PyObject *self, PyObject *args)
 {
-  PyObject *element;
-  PyArrayObject *rin;
-  PyObject *PyPassMethod;
-  npy_uint32 num_particles;
-  track_function integrator;
-  PyObject *pyintegrator;
-  double *drin;
-  struct parameters param;
-  struct LibraryListElement *LibraryListPtr;
+  PyObject
+    *element,
+    *PyPassMethod,
+    *pyintegrator;
+  PyArrayObject
+    *rin;
+  npy_uint32
+    num_particles;
+  track_function
+    integrator;
+  double
+    *drin;
+  struct parameters
+    param;
+  struct LibraryListElement
+    *LibraryListPtr;
 
   if (!PyArg_ParseTuple(args, "OO!", &element,  &PyArray_Type, &rin)) {
     return NULL;
@@ -629,11 +657,14 @@ static PyObject *at_elempass(PyObject *self, PyObject *args)
   pyintegrator = LibraryListPtr->PyFunctionHandle;
   if (pyintegrator) {
     PyObject *kwargs = Buildkwargs(element);
+
     kwargs = pyIntegratorPass(drin, pyintegrator, kwargs, num_particles);
     if (!kwargs) return NULL;
     Py_DECREF(kwargs);
   } else {
-    struct elem *elem_data = integrator(element, NULL, drin, num_particles, &param);
+    struct elem *elem_data =
+      integrator(element, NULL, drin, num_particles, &param);
+
     if (!elem_data) return NULL;
     free(elem_data);
   }
@@ -673,6 +704,7 @@ static PyMethodDef AtMethods[] =
      "\n"
      "         of particle coordinates\n"
      )},
+
    {"elempass",  (PyCFunction)at_elempass, METH_VARARGS,
     PyDoc_STR
     ("elempass(element, rin)\n\n"
@@ -681,6 +713,7 @@ static PyMethodDef AtMethods[] =
      "rin:     6 x n_particles Fortran-ordered numpy array.\n"
      "         On return, rin contains the final coordinates of the particles\n"
      )},
+
    {"isopenmp",  (PyCFunction)isopenmp, METH_NOARGS,
     PyDoc_STR("isopenmp()\n\n"
 	      "Return whether OpenMP is active.\n"
@@ -690,7 +723,7 @@ static PyMethodDef AtMethods[] =
 
 PyMODINIT_FUNC PyInit_atpass(void)
 {
-  PyObject *integ_path_obj, *ext_suffix_obj;
+  PyObject   *integ_path_obj, *ext_suffix_obj;
   const char *ext_suffix, *integ_path;
 
   static struct PyModuleDef moduledef =

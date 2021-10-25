@@ -6,14 +6,26 @@ import sys
 import shutil
 from setuptools import setup, Extension, find_packages
 
+# Command line:
+#   \rm -rf build
+#   CC=g++-11 python3 setup.py <build|build_ext|install|--help>
+
 # Numpy build dependency defined in pyproject.toml.
 import numpy
 
+print('\nPlatform:   ', sys.platform, '\nInstallation', end='')
+if exists('/usr/local/include/omp.h'):
+    print(' Homebrew ')
+elif exists('/opt/local/include/libomp/omp.h'):
+    print(' MacBook')
+
 
 def select_omp():
-    if exists('/usr/local/include/omp.h'):              # Homebrew
+    if exists('/usr/local/include/omp.h'):
+        # Homebrew.
         return '-I/usr/local/include', '/usr/local/lib'
-    elif exists('/opt/local/include/libomp/omp.h'):     # MacPorts
+    elif exists('/opt/local/include/libomp/omp.h'):
+        # MacBook.
         return '-I/opt/local/include/libomp', '/opt/local/lib/libomp'
     else:
         raise FileNotFoundError('\n'.join(('',
@@ -29,9 +41,24 @@ here = abspath(dirname(__file__))
 macros = [('PYAT', None)]
 with_openMP = False
 
-#cflags = []
-cflags = ['-std=gnu++14']
+
+if True:
+    # Clang.
+    cflags = ['-std=gnu++14']
+else:
+    # GNU.
+    cflags = [
+        '-Wl,-no_compact_unwind', '-std=gnu++14', '-bundle',
+        '-undefined dynamic_lookup', '-isysroot',
+        '-I/usr/local/Cellar/gcc/11.2.0/include/c++/11.2.0/tr1',
+        'limits.h']
+#endif
+
+if not sys.platform.startswith('win32'):
+    cflags += ['-Wno-unused-function']
+
 lflags = ['-L/usr/local/Cellar/armadillo/10.6.2/lib', '-larmadillo']
+
 
 omp = os.environ.get('OPENMP', None)
 if omp is None:
@@ -62,9 +89,6 @@ else:
         else:
             omp_lflags = ['-L' + omp_path, '-Wl,-rpath,' + omp_path, '-liomp5']
 
-if not sys.platform.startswith('win32'):
-    cflags += ['-Wno-unused-function']
-
 
 # Get the long description from the README file
 with open(join(here, 'README.rst'), encoding='utf-8') as f:
@@ -86,11 +110,9 @@ diffmatrix_source = abspath(
 
 if exists(integrator_src_orig):
     # Copy files into pyat for distribution.
-    source_files = glob.glob(join(integrator_src_orig, '*.[ch]'))
+#    source_files = glob.glob(join(integrator_src_orig, '*.[ch]'))
+    source_files = glob.glob(join(integrator_src_orig, '*.h'))
     source_files.extend(glob.glob(join(integrator_src_orig, '*.cc')))
-    source_files.extend(
-        glob.glob(join(diffmatrix_source, 'findmpoleraddiffmatrix.cc'))
-    )
     if not exists(integrator_src):
         os.makedirs(integrator_src)
     for f in source_files:
@@ -120,7 +142,7 @@ at = Extension(
     define_macros=macros + omp_macros,
     include_dirs=[numpy.get_include(), integrator_src, diffmatrix_source],
     extra_compile_args=cflags + omp_cflags,
-    extra_link_args=omp_lflags
+    extra_link_args=lflags + omp_lflags
 )
 
 diffmatrix = Extension(
