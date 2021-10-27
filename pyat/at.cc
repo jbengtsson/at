@@ -10,7 +10,6 @@
   #include <string.h>
   #include <omp.h>
 #endif /*_OPENMP*/
-#include "attypes.h"
 #include <stdbool.h> 
 #include <math.h>
 #include <float.h>
@@ -20,6 +19,10 @@
 
 #define NUMPY_IMPORT_ARRAY_RETVAL NULL
 #define NUMPY_IMPORT_ARRAY_TYPE void *
+
+
+#include "attypes.h"
+
 
 typedef PyObject atElem;
 

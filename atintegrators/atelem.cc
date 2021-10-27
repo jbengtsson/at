@@ -19,18 +19,18 @@
 #define atGetInf mxGetInf
 #define atFree mxFree
 
-static void *atMalloc(size_t size)
+static void* atMalloc(size_t size)
 {
-    void *ptr = mxMalloc(size);
-    mexMakeMemoryPersistent(ptr);
-    return ptr;
+  void *ptr = mxMalloc(size);
+  mexMakeMemoryPersistent(ptr);
+  return ptr;
 }
 
-static void *atCalloc(size_t count, size_t size)
+static void* atCalloc(size_t count, size_t size)
 {
-    void *ptr = mxCalloc(count, size);
-    mexMakeMemoryPersistent(ptr);
-    return ptr;
+  void *ptr = mxCalloc(count, size);
+  mexMakeMemoryPersistent(ptr);
+  return ptr;
 }
 
 #else /* !defined(MATLAB_MEX_FILE) */
@@ -56,61 +56,76 @@ typedef mxArray atElem;
 
 static long atGetLong(const mxArray *ElemData, const char *fieldname)
 {
-    mxArray *field=mxGetField(ElemData,0,fieldname);
-    if (!field) mexErrMsgIdAndTxt("AT:WrongArg", "The required attribute %s is missing.", fieldname);
-    return (long)mxGetScalar(field);
+  mxArray* field=mxGetField(ElemData,0,fieldname);
+  if (!field)
+    mexErrMsgIdAndTxt("AT:WrongArg", "The required attribute %s is missing.",
+		      fieldname);
+  return (long)mxGetScalar(field);
 }
 
 static double atGetDouble(const mxArray *ElemData, const char *fieldname)
 {
-    mxArray *field=mxGetField(ElemData,0,fieldname);
-    if (!field) mexErrMsgIdAndTxt("AT:WrongArg", "The required attribute %s is missing.", fieldname);
-    return mxGetScalar(field);
+  mxArray *field=mxGetField(ElemData,0,fieldname);
+  if (!field)
+    mexErrMsgIdAndTxt("AT:WrongArg", "The required attribute %s is missing.",
+		      fieldname);
+  return mxGetScalar(field);
 }
 
-static double* atGetDoubleArraySz(const mxArray *ElemData, const char *fieldname, int *msz, int *nsz)
+static double*
+atGetDoubleArraySz(const mxArray *ElemData, const char *fieldname, int *msz,
+		   int *nsz)
 {
-    mxArray *field=mxGetField(ElemData,0,fieldname);
-    if (!field) mexErrMsgIdAndTxt("AT:WrongArg", "The required attribute %s is missing.", fieldname);
-    *msz = mxGetM(field);  /*Number of rows in the 2-D array*/
-    *nsz = mxGetN(field);  /*Number of columns in the 2-D array.*/
-    return mxGetDoubles(field);
+  mxArray *field=mxGetField(ElemData,0,fieldname);
+  if (!field)
+    mexErrMsgIdAndTxt("AT:WrongArg", "The required attribute %s is missing.",
+		      fieldname);
+  *msz = mxGetM(field);  /*Number of rows in the 2-D array*/
+  *nsz = mxGetN(field);  /*Number of columns in the 2-D array.*/
+  return mxGetDoubles(field);
 }
 
 static double* atGetDoubleArray(const mxArray *ElemData, const char *fieldname)
 {
-    int msz, nsz;
-    return atGetDoubleArraySz(ElemData, fieldname, &msz, &nsz);
+  int msz, nsz;
+  return atGetDoubleArraySz(ElemData, fieldname, &msz, &nsz);
 }
 
-static long atGetOptionalLong(const mxArray *ElemData, const char *fieldname, long default_value)
+static long
+atGetOptionalLong(const mxArray *ElemData, const char *fieldname,
+		  long default_value)
 {
-    mxArray *field=mxGetField(ElemData,0,fieldname);
-    return (field) ? (long)mxGetScalar(field) : default_value;
+  mxArray *field=mxGetField(ElemData,0,fieldname);
+  return (field) ? (long)mxGetScalar(field) : default_value;
 }
 
-static double atGetOptionalDouble(const mxArray *ElemData, const char *fieldname, double default_value)
+static double
+atGetOptionalDouble(const mxArray *ElemData, const char *fieldname,
+		    double default_value)
 {
-    mxArray *field=mxGetField(ElemData,0,fieldname);
-    return (field) ? mxGetScalar(field) : default_value;
+  mxArray *field=mxGetField(ElemData,0,fieldname);
+  return (field) ? mxGetScalar(field) : default_value;
 }
 
-static double* atGetOptionalDoubleArraySz(const mxArray *ElemData, const char *fieldname, int *msz, int *nsz)
+static double*
+atGetOptionalDoubleArraySz(const mxArray *ElemData, const char *fieldname,
+			   int *msz, int *nsz)
 {
-    double *ptr = NULL;
-    mxArray *field=mxGetField(ElemData,0,fieldname);
-    if (field) {
-        *msz = mxGetM(field);
-        *nsz = mxGetN(field);
-        ptr = mxGetDoubles(field);
-    }
-    return ptr;
+  double *ptr = NULL;
+  mxArray *field=mxGetField(ElemData,0,fieldname);
+  if (field) {
+    *msz = mxGetM(field);
+    *nsz = mxGetN(field);
+    ptr = mxGetDoubles(field);
+  }
+  return ptr;
 }
 
-static double* atGetOptionalDoubleArray(const mxArray *ElemData, const char *fieldname)
+static double*
+atGetOptionalDoubleArray(const mxArray *ElemData, const char *fieldname)
 {
-    int msz, nsz;
-    return atGetOptionalDoubleArraySz(ElemData, fieldname, &msz, &nsz);
+  int msz, nsz;
+  return atGetOptionalDoubleArraySz(ElemData, fieldname, &msz, &nsz);
 }
 
 #endif /* MATLAB_MEX_FILE */
@@ -128,107 +143,119 @@ static int array_imported = 0;
 
 static NUMPY_IMPORT_ARRAY_TYPE init_numpy(void)
 {
-    import_array();
-    return NUMPY_IMPORT_ARRAY_RETVAL;
+  import_array();
+  return NUMPY_IMPORT_ARRAY_RETVAL;
 }
 
 static long atGetLong(const PyObject *element, const char *name)
 {
-    const PyObject *attr = PyObject_GetAttrString((PyObject *)element, name);
-    if (!attr) return 0L;
-    Py_DECREF(attr);
-    return PyLong_AsLong((PyObject *)attr);
+  const PyObject *attr = PyObject_GetAttrString((PyObject *)element, name);
+  if (!attr) return 0L;
+  Py_DECREF(attr);
+  return PyLong_AsLong((PyObject *)attr);
 }
 
 static double atGetDouble(const PyObject *element, const char *name)
 {
-    const PyObject *attr = PyObject_GetAttrString((PyObject *)element, name);
-    if (!attr) return 0.0;
-    Py_DECREF(attr);
-    return PyFloat_AsDouble((PyObject *)attr);
+  const PyObject *attr = PyObject_GetAttrString((PyObject *)element, name);
+  if (!attr) return 0.0;
+  Py_DECREF(attr);
+  return PyFloat_AsDouble((PyObject *)attr);
 }
 
-static long atGetOptionalLong(const PyObject *element, const char *name, long default_value)
+static long
+atGetOptionalLong(const PyObject *element, const char *name, long default_value)
 {
-    long l = atGetLong(element, name);
-    if (PyErr_Occurred()) {
-        PyErr_Clear();
-        l = default_value;
-    }
-    return l;
+  long l = atGetLong(element, name);
+  if (PyErr_Occurred()) {
+    PyErr_Clear();
+    l = default_value;
+  }
+  return l;
 }
 
-static double atGetOptionalDouble(const PyObject *element, const char *name, double default_value)
+static double
+atGetOptionalDouble(const PyObject *element, const char *name,
+		    double default_value)
 {
-    double d = atGetDouble(element, name);
-    if (PyErr_Occurred()) {
-        PyErr_Clear();
-        d = default_value;
-    }
-    return d;
+  double d = atGetDouble(element, name);
+  if (PyErr_Occurred()) {
+    PyErr_Clear();
+    d = default_value;
+  }
+  return d;
 }
 
-static double *atGetArrayData(PyArrayObject *array, char *name, int atype, int *msz, int *nsz)
+static double*
+atGetArrayData(PyArrayObject *array, char *name, int atype, int *msz,
+	       int *nsz)
 {
-    char errmessage[60];
-    int ndims;
-    npy_intp *dims;
-    if (!array_imported) {
-        init_numpy();
-        array_imported = 1;
-    }
-    Py_DECREF(array);
-    if (!PyArray_Check(array)) {
-        snprintf(errmessage, 60, "The attribute %s is not an array.", name);
-        PyErr_SetString(PyExc_RuntimeError, errmessage);
-        return NULL;
-    }
-    if (PyArray_TYPE(array) != atype) {
-        snprintf(errmessage, 60, "The attribute %s is not a double array.", name);
-        PyErr_SetString(PyExc_RuntimeError, errmessage);
-        return NULL;
-    }
-    if ((PyArray_FLAGS(array) & NPY_ARRAY_FARRAY_RO) != NPY_ARRAY_FARRAY_RO) {
-        snprintf(errmessage, 60, "The attribute %s is not Fortran-aligned.", name);
-        PyErr_SetString(PyExc_RuntimeError, errmessage);
-        return NULL;
-    }
-    ndims = PyArray_NDIM(array);
-    dims = PyArray_SHAPE(array);
-    *nsz = (ndims >= 2) ? dims[1] : 0;
-    *msz = (ndims >= 1) ? dims[0] : 0;
-    return (double *) PyArray_DATA(array);
+  char errmessage[60];
+  int ndims;
+  npy_intp *dims;
+  if (!array_imported) {
+    init_numpy();
+    array_imported = 1;
+  }
+  Py_DECREF(array);
+  if (!PyArray_Check(array)) {
+    snprintf(errmessage, 60, "The attribute %s is not an array.", name);
+    PyErr_SetString(PyExc_RuntimeError, errmessage);
+    return NULL;
+  }
+  if (PyArray_TYPE(array) != atype) {
+    snprintf(errmessage, 60, "The attribute %s is not a double array.",
+	     name);
+    PyErr_SetString(PyExc_RuntimeError, errmessage);
+    return NULL;
+  }
+  if ((PyArray_FLAGS(array) & NPY_ARRAY_FARRAY_RO) != NPY_ARRAY_FARRAY_RO) {
+    snprintf(errmessage, 60, "The attribute %s is not Fortran-aligned.",
+	     name);
+    PyErr_SetString(PyExc_RuntimeError, errmessage);
+    return NULL;
+  }
+  ndims = PyArray_NDIM(array);
+  dims = PyArray_SHAPE(array);
+  *nsz = (ndims >= 2) ? dims[1] : 0;
+  *msz = (ndims >= 1) ? dims[0] : 0;
+  return (double *) PyArray_DATA(array);
 }
 
-static double *atGetDoubleArraySz(const PyObject *element, char *name, int *msz, int *nsz)
+static double*
+atGetDoubleArraySz(const PyObject *element, char *name, int *msz, int *nsz)
 {
-    PyArrayObject *array = (PyArrayObject *) PyObject_GetAttrString((PyObject *)element, name);
-    if (array == NULL) {
-        return NULL;
-    }
-    return (double *) atGetArrayData(array, name, NPY_DOUBLE, msz, nsz);
+  PyArrayObject *array =
+    (PyArrayObject *) PyObject_GetAttrString((PyObject *)element, name);
+  if (array == NULL) {
+    return NULL;
+  }
+  return (double*) atGetArrayData(array, name, NPY_DOUBLE, msz, nsz);
 }
 
-static double *atGetDoubleArray(const PyObject *element, char *name)
+static double* atGetDoubleArray(const PyObject *element, char *name)
 {
-    int msz, nsz;
-    return atGetDoubleArraySz(element, name, &msz, &nsz);
+  int msz, nsz;
+  return atGetDoubleArraySz(element, name, &msz, &nsz);
 }
 
-static double *atGetOptionalDoubleArraySz(const PyObject *element, char *name, int *msz, int *nsz)
+static double*
+atGetOptionalDoubleArraySz(const PyObject *element, char *name, int *msz,
+			   int *nsz)
 {
-    PyArrayObject *array = (PyArrayObject *) PyObject_GetAttrString((PyObject *)element, name);
-    if (array == NULL) {
-        PyErr_Clear();
-        return NULL;
-    }
-    return (double *) atGetArrayData(array, name, NPY_DOUBLE, msz, nsz);
+  PyArrayObject *array =
+    (PyArrayObject *) PyObject_GetAttrString((PyObject *)element, name);
+  if (array == NULL) {
+    PyErr_Clear();
+    return NULL;
+  }
+  return (double*) atGetArrayData(array, name, NPY_DOUBLE, msz, nsz);
 }
 
-static double *atGetOptionalDoubleArray(const PyObject *element, char *name)
+static double* atGetOptionalDoubleArray(const PyObject *element, char *name)
 {
-    int msz, nsz;
-    return atGetOptionalDoubleArraySz(element, name, &msz, &nsz);
+  int msz, nsz;
+  return atGetOptionalDoubleArraySz(element, name, &msz, &nsz);
 }
 
 #endif /* defined(PYAT) */
@@ -242,8 +269,9 @@ static double *atGetOptionalDoubleArray(const PyObject *element, char *name)
 #define C_LINK
 #endif
 
-C_LINK ExportMode struct elem *trackFunction(const atElem *ElemData, struct elem *Elem, double *r_in,
-                                      int num_particles, struct parameters *Param);
+C_LINK ExportMode struct elem*
+trackFunction(const atElem *ElemData, struct elem *Elem, double *r_in,
+	      int num_particles, struct parameters *Param);
 
 #endif /* defined(PYAT) || defined(MATLAB_MEX_FILE) */
 

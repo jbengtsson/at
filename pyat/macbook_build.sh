@@ -12,7 +12,11 @@ g++ -Wl,-no_compact_unwind -bundle -undefined dynamic_lookup -isysroot \
     -L/usr/local/lib \
     -L/usr/local/opt/openssl@1.1/lib \
     -L/usr/local/opt/sqlite/lib \
+    -L/usr/local/Cellar/armadillo/10.6.2/lib \
+    -lstdc++ \
     -lgsl -lgslcblas \
+    -lgsl \
+    -larmadillo \
     -o build/lib.macosx-10.14-x86_64-3.9/at/tracking/atpass.cpython-39-darwin.so \
     -mmacosx-version-min=10.14
 
