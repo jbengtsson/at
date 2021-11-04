@@ -2,136 +2,135 @@
 #include "atelem.cc"
 #include "atlalib.cc"
 
-struct elem 
-{
-  double Length;
-  double *R1;
-  double *R2;
-  double *T1;
-  double *T2;
-  double *EApertures;
-  double *RApertures;
+
+struct elem {
+  double
+  Length,
+    *R1,
+    *R2,
+    *T1,
+    *T2,
+    *EApertures,
+    *RApertures;
 };
 
-void DriftPass(double *r_in, double le,
-	       const double *T1, const double *T2,
-	       const double *R1, const double *R2,
-	       double *RApertures, double *EApertures,
-	       int num_particles)
+inline double get_p_s(const std::vector<double> &ps)
+{
+  double p_s, p_s2;
+
+  if (true)
+    // Small angle axproximation.
+    p_s = 1e0 + ps[delta_];
+  else {
+    p_s2 = sqr(1e0+ps[delta_]) - sqr(ps[px_]) - sqr(ps[py_]);
+    if (p_s2 >= 0e0)
+      p_s = sqrt(p_s2);
+    else {
+//      printf("get_p_s: *** Speed of light exceeded!\n");
+      p_s = NAN;
+    }
+  }
+  return(p_s);
+}
+
+void Drift(double L, std::vector<double> &ps)
+{
+  double u;
+
+  if (true) {
+    // Small angle axproximation.
+    u = L/(1e0+ps[delta_]);
+    ps[x_]  += u*ps[px_]; ps[y_] += u*ps[py_];
+    ps[ct_] += u*(sqr(ps[px_])+sqr(ps[py_]))/(2e0*(1e0+ps[delta_]));
+  } else {
+    u = L/get_p_s(ps);
+    ps[x_]  += u*ps[px_]; ps[y_] += u*ps[py_];
+    ps[ct_] += u*(1e0+ps[delta_]) - L;
+  }
+  if (false) ps[ct_] += L;
+}
+
+void DriftPass(double ps_n[], double le, const double t1[], const double t2[],
+	       const double r1[], const double r2[], double RApertures[],
+	       double EApertures[], int num_particles)
 /* le - physical length
-   r_in - 6-by-N matrix of initial conditions reshaped into 
+   ps_in - 6-by-N matrix of initial conditions reshaped into 
    1-d array of 6*N elements 
 */
 {
-  double *r6;
-  int c;
-  
-  #pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD*10) \
-    default(shared) shared(r_in,num_particles) private(c,r6)
-  for (c = 0; c<num_particles; c++) { /*Loop over particles  */
-    r6 = r_in+c*6;
-    if(!atIsNaN(r6[0])) {
+  int                 j, k;
+  arma::vec           ps_vec(PS_DIM);
+  std::vector<double> ps(PS_DIM, 0e0);
+
+#pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD*10) \
+  default(shared) shared(ps_in,num_particles) private(c,r6)
+  for (j = 0; j < num_particles; j++) { /*Loop over particles  */
+    // r6 = ps_in+c*6;
+    for (k = 0; k < PS_DIM; k++)
+      ps_vec(k) = ps_n[j*PS_DIM+k];
+    if (!isnan(ps_vec(0))) {
       /*  misalignment at entrance  */
-      if (T1) ATaddvv(r6, T1);
-      if (R1) ATmultmv(r6, R1);
+      if (t1) ps_vec = ps_vec + arrtovec(t1);
+      if (r1) ps_vec = arrtomat(r1)*ps_vec;
+#if 0
       /* Check physical apertures at the entrance of the magnet */
-      if (RApertures) checkiflostRectangularAp(r6,RApertures);
-      if (EApertures) checkiflostEllipticalAp(r6,EApertures);
-      ATdrift6(r6, le);
+      if (RApertures) checkiflostRectangularAp(r6, RApertures);
+      if (EApertures) checkiflostEllipticalAp(r6, EApertures);
+#endif
+      // ATdrift6(r6, le);
+      ps = vectostl(ps_vec);
+      Drift(le, ps);
+      ps_vec = stltovec(ps);
+#if 0
       /* Check physical apertures at the exit of the magnet */
-      if (RApertures) checkiflostRectangularAp(r6,RApertures);
-      if (EApertures) checkiflostEllipticalAp(r6,EApertures);
+      if (RApertures) checkiflostRectangularAp(r6, RApertures);
+      if (EApertures) checkiflostEllipticalAp(r6, EApertures);
+#endif
       /* Misalignment at exit */
-      if (R2) ATmultmv(r6, R2);
-      if (T2) ATaddvv(r6, T2);
+      if (r2) ps_vec = arrtomat(r2)*ps_vec;
+      if (t2) ps_vec = ps_vec + arrtovec(t2);
+      for (k = 0; k < PS_DIM; k++)
+	ps_n[j*PS_DIM+k] = ps_vec(k);
     }
   }
 }
 
-#if defined(MATLAB_MEX_FILE) || defined(PYAT)
-ExportMode struct elem*
-trackFunction(const atElem *ElemData,struct elem *Elem, double *r_in,
+struct elem*
+trackFunction(const atElem *ElemData,struct elem *Elem, double ps_in[],
 	      int num_particles, struct parameters *Param)
 {
-/*  if (ElemData) {*/
-        if (!Elem) {
-            double Length;
-            double *R1, *R2, *T1, *T2, *EApertures, *RApertures;
-            Length=atGetDouble(ElemData,"Length"); check_error();
-            R1=atGetOptionalDoubleArray(ElemData, (char*)"R1"); check_error();
-            R2=atGetOptionalDoubleArray(ElemData, (char*)"R2"); check_error();
-            T1=atGetOptionalDoubleArray(ElemData, (char*)"T1"); check_error();
-            T2=atGetOptionalDoubleArray(ElemData, (char*)"T2"); check_error();
-            EApertures=atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
-	    check_error();
-            RApertures=atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
-	    check_error();
-            Elem = (struct elem*)atMalloc(sizeof(struct elem));
-            Elem->Length=Length;
-            Elem->R1=R1;
-            Elem->R2=R2;
-            Elem->T1=T1;
-            Elem->T2=T2;
-            Elem->EApertures=EApertures;
-            Elem->RApertures=RApertures;
-        }
-        DriftPass(r_in, Elem->Length, Elem->T1, Elem->T2, Elem->R1, Elem->R2,
-		  Elem->RApertures, Elem->EApertures, num_particles);
-/*  }
-    else {
-         atFree(Elem->T1);
-         atFree(Elem->T2);
-         atFree(Elem->R1);
-         atFree(Elem->R2);
-         atFree(Elem->EApertures);
-         atFree(Elem->RApertures);
-     }*/
-    return Elem;
+  /*  if (ElemData) {*/
+  if (!Elem) {
+    double Length;
+    double *R1, *R2, *T1, *T2, *EApertures, *RApertures;
+    Length=atGetDouble(ElemData,"Length"); check_error();
+    R1=atGetOptionalDoubleArray(ElemData, (char*)"R1"); check_error();
+    R2=atGetOptionalDoubleArray(ElemData, (char*)"R2"); check_error();
+    T1=atGetOptionalDoubleArray(ElemData, (char*)"T1"); check_error();
+    T2=atGetOptionalDoubleArray(ElemData, (char*)"T2"); check_error();
+    EApertures=atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
+    check_error();
+    RApertures=atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
+    check_error();
+    Elem = (struct elem*)atMalloc(sizeof(struct elem));
+    Elem->Length=Length;
+    Elem->R1=R1;
+    Elem->R2=R2;
+    Elem->T1=T1;
+    Elem->T2=T2;
+    Elem->EApertures=EApertures;
+    Elem->RApertures=RApertures;
+  }
+  DriftPass(ps_in, Elem->Length, Elem->T1, Elem->T2, Elem->R1, Elem->R2,
+	    Elem->RApertures, Elem->EApertures, num_particles);
+  /*  }
+      else {
+      atFree(Elem->T1);
+      atFree(Elem->T2);
+      atFree(Elem->R1);
+      atFree(Elem->R2);
+      atFree(Elem->EApertures);
+      atFree(Elem->RApertures);
+      }*/
+  return Elem;
 }
-
-MODULE_DEF(DriftPass)        /* Dummy module initialisation */
-
-#endif /*defined(MATLAB_MEX_FILE) || defined(PYAT)*/
-
-#if defined(MATLAB_MEX_FILE)
-void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
-{
-    if (nrhs == 2) {
-        double *r_in;
-        const mxArray *ElemData = prhs[0];
-        int num_particles = mxGetN(prhs[1]);
-        double Length;
-        double *R1, *R2, *T1, *T2, *EApertures, *RApertures;
-        Length=atGetDouble(ElemData,"Length"); check_error();
-        R1=atGetOptionalDoubleArray(ElemData,"R1"); check_error();
-        R2=atGetOptionalDoubleArray(ElemData,"R2"); check_error();
-        T1=atGetOptionalDoubleArray(ElemData,"T1"); check_error();
-        T2=atGetOptionalDoubleArray(ElemData,"T2"); check_error();
-        EApertures=atGetOptionalDoubleArray(ElemData,"EApertures"); check_error();
-        RApertures=atGetOptionalDoubleArray(ElemData,"RApertures"); check_error();
-        if (mxGetM(prhs[1]) != 6) mexErrMsgIdAndTxt("AT:WrongArg","Second argument must be a 6 x N matrix");
-        /* ALLOCATE memory for the output array of the same size as the input  */
-        plhs[0] = mxDuplicateArray(prhs[1]);
-        r_in = mxGetDoubles(plhs[0]);
-        DriftPass(r_in, Length, T1, T2, R1, R2, RApertures, EApertures, num_particles);
-    }
-    else if (nrhs == 0) {
-        /* list of required fields */
-        plhs[0] = mxCreateCellMatrix(1,1);
-        mxSetCell(plhs[0],0,mxCreateString("Length"));
-        if (nlhs>1) {
-            /* list of optional fields */
-            plhs[1] = mxCreateCellMatrix(6,1);
-            mxSetCell(plhs[1],0,mxCreateString("T1"));
-            mxSetCell(plhs[1],1,mxCreateString("T2"));
-            mxSetCell(plhs[1],2,mxCreateString("R1"));
-            mxSetCell(plhs[1],3,mxCreateString("R2"));
-            mxSetCell(plhs[1],4,mxCreateString("RApertures"));
-            mxSetCell(plhs[1],5,mxCreateString("EApertures"));
-        }
-    }
-    else {
-        mexErrMsgIdAndTxt("AT:WrongArg","Needs 0 or 2 arguments");
-    }
-}
-#endif /*defined(MATLAB_MEX_FILE)*/

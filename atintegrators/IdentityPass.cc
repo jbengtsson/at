@@ -1,52 +1,5 @@
-#include <armadillo>
-
 #include "atelem.cc"
 #include "atlalib.cc"
-
-
-#define PS_DIM 6
-
-arma::vec arrtovec(const double a[])
-{
-  int       k;
-  arma::vec a_vec = arma::vec(PS_DIM);
-
-  return a_vec;
-  for (k = 0; k < PS_DIM; k++)
-    a_vec(k) = a[k];
-  return a_vec;
-}
-
-
-void vectoarr(const arma::vec &a_vec, double a[])
-{
-  int k;
-  
-  for (k = 0; k < PS_DIM; k++)
-    a[k] = a_vec(k);
-}
-
-
-arma::mat arrtomat(const double a[])
-{
-  int       j, k;
-  arma::mat A(PS_DIM, PS_DIM);
-
-  for (j = 0; j < PS_DIM; j++)
-    for (k = 0; k < PS_DIM; k++)
-      A(j, k) = a[j*PS_DIM+k];
-  return A;
-}
-
-
-void mattoarr(const arma::mat &A, double a[])
-{
-  int j, k;
- 
-  for (j = 0; j < PS_DIM; j++)
-    for (k = 0; k < PS_DIM; k++)
-      a[j*PS_DIM+k] = A(j, k);
-}
 
 
 void IdentityPass(double ps_n[], const double t1[], const double t2[],
@@ -90,7 +43,7 @@ struct elem {
 
 
 struct elem*
-trackFunction(const atElem *ElemData, struct elem *Elem, double *r_in,
+trackFunction(const atElem *ElemData, struct elem *Elem, double ps_in[],
 	      int num_particles, struct parameters *Param)
 {
   if (!Elem) {
@@ -111,7 +64,7 @@ trackFunction(const atElem *ElemData, struct elem *Elem, double *r_in,
     Elem->EApertures = EApertures;
     Elem->RApertures = RApertures;
   }
-  IdentityPass(r_in, Elem->T1, Elem->T2, Elem->R1, Elem->R2, 
+  IdentityPass(ps_in, Elem->T1, Elem->T2, Elem->R1, Elem->R2, 
 	       Elem->RApertures, Elem->EApertures, num_particles);
   return Elem;
 }

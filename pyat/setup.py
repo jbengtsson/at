@@ -8,7 +8,7 @@ from setuptools import setup, Extension, find_packages
 
 # Command line:
 #   \rm -rf build
-#   CC=g++-11 python3 setup.py <build|build_ext|install|--help>
+#   CC=g++-11 python3 setup.py <build|build_ext|install|--help> -i
 
 # Numpy build dependency defined in pyproject.toml.
 import numpy
