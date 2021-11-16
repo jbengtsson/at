@@ -150,6 +150,30 @@ inline void fastdrift(double ps[], const double L)
   stltoarr(ps_stl, ps);
 }
 
+void p_rot(double phi, std::vector<double> &ps)
+{
+  double              c, s, t, pz, p, val;
+  std::vector<double> ps1;
+
+  c = cos(phi*M_PI/180e0); s = sin(phi*M_PI/180e0); t = tan(phi*M_PI/180e0);
+  pz = get_p_s(ps);
+
+  if (true) {
+    ps[px_] = s*pz + c*ps[px_];
+  } else {
+    // ps1 = ps; p = c*pz - s*ps1[px_];
+    // px[x_]   = ps1[x_]*pz/p; px[px_] = s*pz + c*ps1[px_];
+    // px[y_]  += ps1[x_]*ps1[py_]*s/p;
+    // px[ct_] += (1e0+ps1[delta_])*ps1[x_]*s/p;
+
+    ps1 = ps; val = 1e0 - ps1[px_]*t/pz;
+    ps[x_]  = ps1[x_]/(c*val);
+    ps[px_] = ps1[px_]*c + s*pz;
+    ps[y_]  = ps1[y_] + t*ps1[x_]*ps1[py_]/(pz*val);
+    ps[ct_] = ps1[ct_] + ps1[x_]*(1e0+ps1[delta_])*t/(pz*val);
+  }
+}
+
 static double get_psi(double irho, double phi, double gap)
 {
   /* Correction for magnet gap (longitudinal fringe field)
@@ -186,38 +210,24 @@ void EdgeFocus(const double irho, const double phi, const double gap,
   if (false) {
     // warning: => diverging Taylor map (see SSC-141)
     // ps[py_] -=
-    //   irho*tan(phi*M_PI/180e0-get_psi(irho, phi, gap))*ps[y_]/(1e0+ps[delta_]);
-    // Leading order correction.
+    //   irho*tan(phi*M_PI/180e0-get_psi(irho, phi, gap))*ps[y_]
+    //   /(1e0+ps[delta_]);
+    // leading order correction.
     ps[py_] -=
       irho*tan(phi*M_PI/180e0-get_psi(irho, phi, gap))*ps[y_]*(1e0-ps[delta_]);
   } else
     ps[py_] -= irho*tan(phi*M_PI/180e0-get_psi(irho, phi, gap))*ps[y_];
 }
 
-
-template<typename T>
-void p_rot(double phi, std::vector<double> &ps)
+static void edge_fringe(double ps[], const double inv_rho,
+			const double edge_angle, const double fint,
+			const double gap, const int method, const bool hor)
 {
-  double              c, s, t, pz, p, val;
-  std::vector<double> ps1;
+  std::vector<double> ps_stl(PS_DIM, 0e0);
 
-  c = cos(phi*M_PI/180e0); s = sin(phi*M_PI/180e0); t = tan(phi*M_PI/180e0);
-  pz = get_p_s(ps);
-
-  if (true) {
-    ps[px_] = s*pz + c*ps[px_];
-  } else {
-    // ps1 = ps; p = c*pz - s*ps1[px_];
-    // px[x_]   = ps1[x_]*pz/p; px[px_] = s*pz + c*ps1[px_];
-    // px[y_]  += ps1[x_]*ps1[py_]*s/p;
-    // px[ct_] += (1e0+ps1[delta_])*ps1[x_]*s/p;
-
-    ps1 = ps; val = 1e0 - ps1[px_]*t/pz;
-    ps[x_]  = ps1[x_]/(c*val);
-    ps[px_] = ps1[px_]*c + s*pz;
-    ps[y_]  = ps1[y_] + t*ps1[x_]*ps1[py_]/(pz*val);
-    ps[ct_] = ps1[ct_] + ps1[x_]*(1e0+ps1[delta_])*t/(pz*val);
-  }
+  ps_stl = arrtostl(ps);
+  EdgeFocus(inv_rho, edge_angle*180e0/M_PI, gap, ps_stl);
+  stltoarr(ps_stl, ps);
 }
 
 void thin_kick(const int Order, const double MB[], const double L,
@@ -314,6 +324,43 @@ static void fastdrift(double* r, double NormL)
   r[5] += NormL*(r[1]*r[1]+r[3]*r[3])/(2*(1+r[4]));
 }
 
+static void edge_fringe(double r[], const double const inv_rho,
+			const double edge_angle, const double fint,
+			const double gap, const int method, const bool hor)
+{
+  /*     method 0 no fringe field
+   *     method 1 legacy version Brown First Order
+   *     method 2 SOLEIL close to second order of Brown
+   *     method 3 THOMX
+   */
+  double fringecorr, fx, fy;
+  /* Fringe field correction */
+  if ((fint==0.0) || (gap==0.0) || (method==0))
+    fringecorr = 0.0;
+  else {
+    double sedge = sin(edge_angle);
+    double cedge = cos(edge_angle);
+    fringecorr = inv_rho*gap*fint*(1+sedge*sedge)/cedge;
+  }
+    
+  /* Edge angle focusing */
+  fx = inv_rho*tan(edge_angle);
+  if (method==1)
+    fy = inv_rho*tan(edge_angle-fringecorr/(1+r[4]));
+  else if (method==2)
+    fy = inv_rho*tan(edge_angle-fringecorr/(1+r[4]))/(1+r[4]);
+  else if (method==3)
+    if (hor)
+      fy = inv_rho*tan(edge_angle-fringecorr+r[1]/(1+r[4]));
+    else
+      fy = inv_rho*tan(edge_angle-fringecorr-r[1]/(1+r[4]));
+  else    /* fall back to legacy version */
+    fy = inv_rho*tan(edge_angle-fringecorr/(1+r[4]));
+
+  r[1] += r[0]*fx;
+  r[3] -= r[2]*fy;
+}
+
 static void strthinkick(double* r, const double* A, const double* B, double L,
 			int max_order)
 /***************************************************************************** 
@@ -364,7 +411,7 @@ theta  = --- B
 
 *************************************************************************/
 {
-  int i;
+  int    i;
   double ReSum = B[max_order];
   double ImSum = A[max_order];
   double ReSumTemp;
@@ -384,67 +431,164 @@ theta  = --- B
 #endif
 
 static void edge_fringe_entrance(double* r, double inv_rho, double edge_angle,
-        double fint, double gap, int method)
-{  
-    /*     method 0 no fringe field
-     *     method 1 legacy version Brown First Order
-     *     method 2 SOLEIL close to second order of Brown
-     *     method 3 THOMX
-     */
-    double fringecorr, fx, fy;
-    /* Fringe field correction */
-    if ((fint==0.0) || (gap==0.0) || (method==0))
-        fringecorr = 0.0;
-    else {
-        double sedge = sin(edge_angle);
-        double cedge = cos(edge_angle);
-        fringecorr = inv_rho*gap*fint*(1+sedge*sedge)/cedge;
-    }
-    
-    /* Edge angle focusing */
-    fx = inv_rho*tan(edge_angle);
-    if (method==1)
-        fy = inv_rho*tan(edge_angle-fringecorr/(1+r[4]));
-    else if (method==2)
-        fy = inv_rho*tan(edge_angle-fringecorr/(1+r[4]))/(1+r[4]);
-    else if (method==3)
-        fy = inv_rho*tan(edge_angle-fringecorr+r[1]/(1+r[4]));
-    else    /* fall back to legacy version */
-        fy = inv_rho*tan(edge_angle-fringecorr/(1+r[4]));
+				 double fint, double gap, int method)
+{ edge_fringe(r, inv_rho, edge_angle, fint, gap, method, true); }
 
-    r[1]+=r[0]*fx;
-    r[3]-=r[2]*fy;
-}
 
 static void edge_fringe_exit(double* r, double inv_rho, double edge_angle,
-        double fint, double gap, int method)
-{
-    /*     method 0 no fringe field
-     *     method 1 legacy version Brown First Order
-     *     method 2 SOLEIL close to second order of Brown
-     *     method 3 THOMX
-     */
-    /* Fringe field correction */
-    double fringecorr, fx, fy;
-    if ((fint==0.0) || (gap==0.0) || (method==0))
-        fringecorr = 0.0;
-    else {
-        double sedge = sin(edge_angle);
-        double cedge = cos(edge_angle);
-        fringecorr = inv_rho*gap*fint*(1+sedge*sedge)/cedge;
-    }
-    
-    /* Edge angle focusing */
-    fx = inv_rho*tan(edge_angle);
-    if (method==1)
-        fy = inv_rho*tan(edge_angle-fringecorr/(1+r[4]));
-    else if (method==2)
-        fy = inv_rho*tan(edge_angle-fringecorr/(1+r[4]))/(1+r[4]);
-    else if (method==3)
-        fy = inv_rho*tan(edge_angle-fringecorr-r[1]/(1+r[4]));
-    else    /* fall back to legacy version */
-        fy = inv_rho*tan(edge_angle-fringecorr/(1+r[4]));
+			     double fint, double gap, int method)
+{ edge_fringe(r, inv_rho, edge_angle, fint, gap, method, false); }
 
-    r[1]+=r[0]*fx;
-    r[3]-=r[2]*fy;
+
+static void QuadFringePassP(double* r, const double b2)
+{
+  /*	x=r[0],px=r[1],y=r[2],py=r[3],delta=r[4],ct=r[5] 
+	Lee-Whiting's thin lens limit formula as given in p. 390 of "Beam Dynamics..."by E. Forest */
+  double u  = b2/(12.0*(1.0+r[4]));
+  double x2 = r[0]*r[0];
+  double z2 = r[2]*r[2];
+  double xz = r[0]*r[2];
+  double gx = u * (x2+3*z2) * r[0];
+  double gz = u * (z2+3*x2) * r[2];
+  double r1tmp=0;
+  double r3tmp=0;
+
+  r[0]+=gx;
+  r1tmp=3*u*(2*xz*r[3]-(x2+z2)*r[1]);
+   
+  r[2]-=gz;
+   
+  r3tmp=3*u*(2*xz*r[1]-(x2+z2)*r[3]);
+  r[5]-=(gz*r[3] - gx*r[1])/(1+r[4]);
+   
+  r[1]+=r1tmp;
+  r[3]-=r3tmp;
+}
+
+static void QuadFringePassN(double* r, const double b2)
+{
+  /*	x=r[0],px=r[1],y=r[2],py=r[3],delta=r[4],ct=r[5] 
+	Lee-Whiting's thin lens limit formula as given in p. 390 of "Beam Dynamics..."by E. Forest */
+  double u = b2/(12.0*(1.0+r[4]));
+  double x2 = r[0]*r[0];
+  double z2 = r[2]*r[2];
+  double xz = r[0]*r[2];
+  double gx = u * (x2+3*z2) * r[0];
+  double gz = u * (z2+3*x2) * r[2];
+  double r1tmp=0;
+  double r3tmp=0;
+
+  r[0]-=gx;
+  r1tmp=3*u*(2*xz*r[3]-(x2+z2)*r[1]);
+   
+  r[2]+=gz;
+   
+  r3tmp=3*u*(2*xz*r[1]-(x2+z2)*r[3]);
+  r[5]+=(gz*r[3] - gx*r[1])/(1+r[4]);
+   
+  r[1]-=r1tmp;
+  r[3]+=r3tmp;
+}
+
+/* from elegant code */
+static void quadPartialFringeMatrix(double R[6][6], double K1, double inFringe,
+				    double *fringeInt, int part)
+{
+  double J1x, J2x, J3x, J1y, J2y, J3y;
+  double K1sqr, expJ1x, expJ1y;
+
+  R[4][4] = R[5][5] = 1;
+  
+  K1sqr = K1*K1;
+
+  if (part==1) {
+    J1x = inFringe*(K1*fringeInt[1] - 2*K1sqr*fringeInt[3]/3.);
+    J2x = inFringe*(K1*fringeInt[2]);
+    J3x = inFringe*(K1sqr*(fringeInt[2] + fringeInt[4]));
+
+    K1 = -K1;
+    J1y = inFringe*(K1*fringeInt[1] - 2*K1sqr*fringeInt[3]/3.);
+    J2y = -J2x;
+    J3y = J3x;
+  } else {
+    J1x = inFringe*(K1*fringeInt[1] + K1sqr*fringeInt[0]*fringeInt[2]/2);
+    J2x = inFringe*(K1*fringeInt[2]);
+    J3x = inFringe*(K1sqr*(fringeInt[4]-fringeInt[0]*fringeInt[1]));
+
+    K1 = -K1;
+    J1y = inFringe*(K1*fringeInt[1] + K1sqr*fringeInt[0]*fringeInt[2]);
+    J2y = -J2x;
+    J3y = J3x;
+  }
+
+  expJ1x = R[0][0] = exp(J1x);
+  R[0][1] = J2x/expJ1x;
+  R[1][0] = expJ1x*J3x;
+  R[1][1] = (1 + J2x*J3x)/expJ1x;
+  
+  expJ1y = R[2][2] = exp(J1y);
+  R[2][3] = J2y/expJ1y;
+  R[3][2] = expJ1y*J3y;
+  R[3][3] = (1 + J2y*J3y)/expJ1y;
+
+  return;
+}
+
+static void linearQuadFringeElegantEntrance
+(double* r6, double b2, double *fringeIntM0, double *fringeIntP0)
+{
+  double R[6][6];
+  double *fringeIntM, *fringeIntP;
+  double delta, inFringe;
+  /* quadrupole linear fringe field, from elegant code */
+  inFringe=-1.0;
+  fringeIntM = fringeIntP0;
+  fringeIntP = fringeIntM0;
+  delta = r6[4];
+  /* determine first linear matrix for this delta */
+  quadPartialFringeMatrix(R, b2/(1+delta), inFringe, fringeIntM, 1);
+  r6[0] = R[0][0]*r6[0] + R[0][1]*r6[1];
+  r6[1] = R[1][0]*r6[0] + R[1][1]*r6[1];
+  r6[2] = R[2][2]*r6[2] + R[2][3]*r6[3];
+  r6[3] = R[3][2]*r6[2] + R[3][3]*r6[3];
+  /* nonlinear fringe field */
+  QuadFringePassP(r6,b2);   /*This is original AT code*/
+  /*Linear fringe fields from elegant*/
+  inFringe=-1.0;
+  /* determine and apply second linear matrix, from elegant code */
+  quadPartialFringeMatrix(R, b2/(1+delta), inFringe, fringeIntP, 2);
+  r6[0] = R[0][0]*r6[0] + R[0][1]*r6[1];
+  r6[1] = R[1][0]*r6[0] + R[1][1]*r6[1];
+  r6[2] = R[2][2]*r6[2] + R[2][3]*r6[3];
+  r6[3] = R[3][2]*r6[2] + R[3][3]*r6[3];
+}
+
+
+static void linearQuadFringeElegantExit
+(double* r6, double b2, double *fringeIntM0, double *fringeIntP0)
+{
+  double R[6][6];
+  double *fringeIntM, *fringeIntP;
+  double delta, inFringe;
+  /* quadrupole linear fringe field, from elegant code */
+  inFringe=1.0;
+  fringeIntM = fringeIntM0;
+  fringeIntP = fringeIntP0;
+  delta = r6[4];
+  /* determine first linear matrix for this delta */
+  quadPartialFringeMatrix(R, b2/(1+delta), inFringe, fringeIntM, 1);
+  r6[0] = R[0][0]*r6[0] + R[0][1]*r6[1];
+  r6[1] = R[1][0]*r6[0] + R[1][1]*r6[1];
+  r6[2] = R[2][2]*r6[2] + R[2][3]*r6[3];
+  r6[3] = R[3][2]*r6[2] + R[3][3]*r6[3];
+  /* nonlinear fringe field */
+  QuadFringePassN(r6,b2);   /*This is original AT code*/
+  /*Linear fringe fields from elegant*/
+  inFringe=1.0;
+  /* determine and apply second linear matrix, from elegant code */
+  quadPartialFringeMatrix(R, b2/(1+delta), inFringe, fringeIntP, 2);
+  r6[0] = R[0][0]*r6[0] + R[0][1]*r6[1];
+  r6[1] = R[1][0]*r6[0] + R[1][1]*r6[1];
+  r6[2] = R[2][2]*r6[2] + R[2][3]*r6[3];
+  r6[3] = R[3][2]*r6[2] + R[3][3]*r6[3];
 }

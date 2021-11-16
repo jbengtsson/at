@@ -63,7 +63,7 @@ void StrMPoleSymplectic4Pass
     A[0] += sin(KickAngle[1])/le;
   }
 
-#pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD)	\
+#pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD)        \
   default(none)								    \
   shared(ps_n, num_particles, R1, T1, R2, T2, RApertures, EApertures, A, B, \
 	 L1, L2, K1, K2, max_order, num_int_steps, FringeQuadEntrance,      \
