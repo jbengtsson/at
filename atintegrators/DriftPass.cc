@@ -14,41 +14,6 @@ struct elem {
     *RApertures;
 };
 
-inline double get_p_s(const std::vector<double> &ps)
-{
-  double p_s, p_s2;
-
-  if (true)
-    // Small angle axproximation.
-    p_s = 1e0 + ps[delta_];
-  else {
-    p_s2 = sqr(1e0+ps[delta_]) - sqr(ps[px_]) - sqr(ps[py_]);
-    if (p_s2 >= 0e0)
-      p_s = sqrt(p_s2);
-    else {
-//      printf("get_p_s: *** Speed of light exceeded!\n");
-      p_s = NAN;
-    }
-  }
-  return(p_s);
-}
-
-void Drift(double L, std::vector<double> &ps)
-{
-  double u;
-
-  if (true) {
-    // Small angle axproximation.
-    u = L/(1e0+ps[delta_]);
-    ps[x_]  += u*ps[px_]; ps[y_] += u*ps[py_];
-    ps[ct_] += u*(sqr(ps[px_])+sqr(ps[py_]))/(2e0*(1e0+ps[delta_]));
-  } else {
-    u = L/get_p_s(ps);
-    ps[x_]  += u*ps[px_]; ps[y_] += u*ps[py_];
-    ps[ct_] += u*(1e0+ps[delta_]) - L;
-  }
-  if (false) ps[ct_] += L;
-}
 
 void DriftPass(double ps_n[], double le, const double t1[], const double t2[],
 	       const double r1[], const double r2[], double RApertures[],
@@ -58,12 +23,11 @@ void DriftPass(double ps_n[], double le, const double t1[], const double t2[],
    1-d array of 6*N elements 
 */
 {
-  int                 j, k;
-  arma::vec           ps_vec(PS_DIM);
-  std::vector<double> ps(PS_DIM, 0e0);
+  int       j, k;
+  arma::vec ps_vec(PS_DIM);
 
 #pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD*10) \
-  default(shared) shared(ps_in,num_particles) private(c,r6)
+  default(shared) shared(ps_in,num_particles) private(c, r6)
   for (j = 0; j < num_particles; j++) { /*Loop over particles  */
     // r6 = ps_in+c*6;
     for (k = 0; k < PS_DIM; k++)
@@ -78,9 +42,7 @@ void DriftPass(double ps_n[], double le, const double t1[], const double t2[],
       if (EApertures) checkiflostEllipticalAp(r6, EApertures);
 #endif
       // ATdrift6(r6, le);
-      ps = vectostl(ps_vec);
-      Drift(le, ps);
-      ps_vec = stltovec(ps);
+      Drift(ps_vec, le);
 #if 0
       /* Check physical apertures at the exit of the magnet */
       if (RApertures) checkiflostRectangularAp(r6, RApertures);
