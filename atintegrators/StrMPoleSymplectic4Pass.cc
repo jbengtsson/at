@@ -1,6 +1,6 @@
 #include "atelem.cc"
 #include "atlalib.cc"
-#include "driftkick.cc"		/* fastdrift.c, strthinkick.c */
+#include "atphyslib.cc"
 #include "quadfringe.cc"	/* QuadFringePassP, QuadFringePassN */
 
 #define DRIFT1  0.6756035959798286638

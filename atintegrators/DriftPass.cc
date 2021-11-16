@@ -1,6 +1,7 @@
 
 #include "atelem.cc"
 #include "atlalib.cc"
+#include "atphyslib.cc"
 
 
 struct elem {
@@ -15,47 +16,39 @@ struct elem {
 };
 
 
-void DriftPass(double ps_n[], double le, const double t1[], const double t2[],
-	       const double r1[], const double r2[], double RApertures[],
-	       double EApertures[], int num_particles)
+void DriftPass(double *r_in, double le,
+	       const double *T1, const double *T2,
+	       const double *R1, const double *R2,
+	       double *RApertures, double *EApertures,
+	       int num_particles)
 /* le - physical length
-   ps_in - 6-by-N matrix of initial conditions reshaped into 
-   1-d array of 6*N elements 
-*/
+   r_in - 6-by-N matrix of initial conditions reshaped into 
+   1-d array of 6*N elements                                                  */
 {
-  int       j, k;
-  arma::vec ps_vec(PS_DIM);
-
-#pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD*10) \
-  default(shared) shared(ps_in,num_particles) private(c, r6)
-  for (j = 0; j < num_particles; j++) { /*Loop over particles  */
-    // r6 = ps_in+c*6;
-    for (k = 0; k < PS_DIM; k++)
-      ps_vec(k) = ps_n[j*PS_DIM+k];
-    if (!isnan(ps_vec(0))) {
+  double *r6;
+  int c;
+  
+#pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD*10) default(shared) shared(r_in,num_particles) private(c,r6)
+  for (c = 0; c<num_particles; c++) { /*Loop over particles  */
+    r6 = r_in+c*6;
+    if(!atIsNaN(r6[0])) {
       /*  misalignment at entrance  */
-      if (t1) ps_vec = ps_vec + arrtovec(t1);
-      if (r1) ps_vec = arrtomat(r1)*ps_vec;
-#if 0
+      if (T1) ATaddvv(r6, T1);
+      if (R1) ATmultmv(r6, R1);
       /* Check physical apertures at the entrance of the magnet */
-      if (RApertures) checkiflostRectangularAp(r6, RApertures);
-      if (EApertures) checkiflostEllipticalAp(r6, EApertures);
-#endif
-      // ATdrift6(r6, le);
-      Drift(ps_vec, le);
-#if 0
+      if (RApertures) checkiflostRectangularAp(r6,RApertures);
+      if (EApertures) checkiflostEllipticalAp(r6,EApertures);
+      ATdrift6(r6, le);
       /* Check physical apertures at the exit of the magnet */
-      if (RApertures) checkiflostRectangularAp(r6, RApertures);
-      if (EApertures) checkiflostEllipticalAp(r6, EApertures);
-#endif
+      if (RApertures) checkiflostRectangularAp(r6,RApertures);
+      if (EApertures) checkiflostEllipticalAp(r6,EApertures);
       /* Misalignment at exit */
-      if (r2) ps_vec = arrtomat(r2)*ps_vec;
-      if (t2) ps_vec = ps_vec + arrtovec(t2);
-      for (k = 0; k < PS_DIM; k++)
-	ps_n[j*PS_DIM+k] = ps_vec(k);
+      if (R2) ATmultmv(r6, R2);
+      if (T2) ATaddvv(r6, T2);
     }
   }
 }
+
 
 struct elem*
 trackFunction(const atElem *ElemData,struct elem *Elem, double ps_in[],
