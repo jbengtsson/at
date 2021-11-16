@@ -18,6 +18,9 @@
 
 #define PS_DIM 6
 
+#define TWOPI  6.28318530717959
+#define C0     2.99792458e8
+
 
 #define sqr(x)  ((x)*(x))
 #define cube(x) ((x)*(x)*(x))
@@ -94,7 +97,7 @@ void mattoarr(const arma::mat &A, double a[])
       a[j*PS_DIM+k] = A(j, k);
 }
 
-#if 1
+#if 0
 
 inline double get_p_s(const std::vector<double> &ps)
 {
@@ -324,7 +327,7 @@ static void fastdrift(double* r, double NormL)
   r[5] += NormL*(r[1]*r[1]+r[3]*r[3])/(2*(1+r[4]));
 }
 
-static void edge_fringe(double r[], const double const inv_rho,
+static void edge_fringe(double r[], const double inv_rho,
 			const double edge_angle, const double fint,
 			const double gap, const int method, const bool hor)
 {
@@ -426,6 +429,52 @@ theta  = --- B
   r[1] -=  L*(ReSum-(r[4]-r[0]*irho)*irho);
   r[3] +=  L*ImSum;
   r[5] +=  L*irho*r[0]; /* pathlength */
+}
+
+void CavityPass(double *r_in, double le, double nv, double freq, double lag,
+		int num_particles)
+/* le - physical length
+ * nv - peak voltage (V) normalized to the design enegy (eV)
+ * r is a 6-by-N matrix of initial conditions reshaped into
+ * 1-d array of 6*N elements
+ */
+{	int c, c6;
+  double halflength , p_norm, NormL;
+  if(le == 0)
+    {
+      for(c = 0;c<num_particles;c++)
+        {
+	  c6 = c*6;
+	  if(!atIsNaN(r_in[c6]))
+	    r_in[c6+4] += -nv*sin(TWOPI*freq*(r_in[c6+5]-lag)/C0);
+        }
+    }
+  else
+    {
+      halflength = le/2;
+      for(c = 0;c<num_particles;c++)
+        {
+	  c6 = c*6;
+	  if(!atIsNaN(r_in[c6]))
+            {   p_norm = 1/(1+r_in[c6+4]);
+	      NormL  = halflength*p_norm;
+	      /* Prropagate through a drift equal to half cavity length */
+	      r_in[c6+0]+= NormL*r_in[c6+1];
+	      r_in[c6+2]+= NormL*r_in[c6+3];
+	      r_in[c6+5]+=
+		NormL*p_norm*(r_in[c6+1]*r_in[c6+1]+r_in[c6+3]*r_in[c6+3])/2;
+	      /* Longitudinal momentum kick */
+	      r_in[c6+4] += -nv*sin(TWOPI*freq*(r_in[c6+5]-lag)/C0);
+	      p_norm = 1/(1+r_in[c6+4]);
+	      NormL  = halflength*p_norm;
+	      /* Prropagate through a drift equal to half cavity length */
+	      r_in[c6+0]+= NormL*r_in[c6+1];
+	      r_in[c6+2]+= NormL*r_in[c6+3];
+	      r_in[c6+5]+=
+		NormL*p_norm*(r_in[c6+1]*r_in[c6+1]+r_in[c6+3]*r_in[c6+3])/2;
+            }
+        }
+    }
 }
 
 #endif
