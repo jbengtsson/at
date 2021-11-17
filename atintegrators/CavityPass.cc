@@ -19,6 +19,24 @@ struct elem
 };
 
 
+void CavityPass(double r_in[], const double le, const double nv,
+		const double freq, const double lag, const int num_particles)
+/* le - physical length
+ * nv - peak voltage (V) normalized to the design enegy (eV)
+ * r is a 6-by-N matrix of initial conditions reshaped into
+ * 1-d array of 6*N elements
+ */
+{
+  int c, c6;
+
+  for(c = 0; c < num_particles; c++) {
+    c6 = c*6;
+    if(!atIsNaN(r_in[c6]))
+      cav_pass(&r_in[c6], le, nv, freq, lag);
+  }
+}
+
+
 #if defined(MATLAB_MEX_FILE) || defined(PYAT)
 ExportMode struct elem*
 trackFunction(const atElem *ElemData,struct elem *Elem,

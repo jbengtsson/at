@@ -1,17 +1,18 @@
-/*   File: atphyslib.c
- *   Common physics functions for Accelerator Toolbox
- *   A.Terebilo   10/28/04
- *
- *   functions edge_fringe2A and edge_fringe2B were added by Xiaobiao Huang, August 2009
- *
- *   Two additional methods for bending magnet fringe fields added, February 2017
- *   method 1 legacy version Brown First Order
- *   Version 2 SOLEIL close to second order of Brown
- *   Version 3 THOMX
- */
+/*  File: atphyslib.c
+    Common physics functions for Accelerator Toolbox
+    A.Terebilo   10/28/04
+ 
+    functions edge_fringe2A and edge_fringe2B were added by Xiaobiao Huang,
+    August 2009
+ 
+    Two additional methods for bending magnet fringe fields added, February
+    2017
+    method 1 legacy version Brown First Order
+    Version 2 SOLEIL close to second order of Brown
+    Version 3 THOMX
+                                                                              */
 
 #include <math.h>
-
 
 #include <armadillo>
 
@@ -97,8 +98,6 @@ void mattoarr(const arma::mat &A, double a[])
       a[j*PS_DIM+k] = A(j, k);
 }
 
-#if 0
-
 inline double get_p_s(const std::vector<double> &ps)
 {
   double p_s, p_s2;
@@ -116,121 +115,6 @@ inline double get_p_s(const std::vector<double> &ps)
     }
   }
   return(p_s);
-}
-
-void Drift(double L, std::vector<double> &ps)
-{
-  double u;
-
-  if (true) {
-    // Small angle axproximation.
-    u = L/(1e0+ps[delta_]);
-    ps[x_]  += u*ps[px_]; ps[y_] += u*ps[py_];
-    ps[ct_] += u*(sqr(ps[px_])+sqr(ps[py_]))/(2e0*(1e0+ps[delta_]));
-  } else {
-    u = L/get_p_s(ps);
-    ps[x_]  += u*ps[px_]; ps[y_] += u*ps[py_];
-    ps[ct_] += u*(1e0+ps[delta_]) - L;
-  }
-  if (false) ps[ct_] += L;
-}
-
-inline void atdrift(double ps[], const double L)
-{
-  std::vector<double> ps_stl(PS_DIM, 0e0);
-
-  ps_stl = arrtostl(ps);
-  Drift(L, ps_stl);
-  stltoarr(ps_stl, ps);
-}
-
-inline void fastdrift(double ps[], const double L)
-{
-  std::vector<double> ps_stl(PS_DIM, 0e0);
-
-  ps_stl = arrtostl(ps);
-  Drift(L, ps_stl);
-  stltoarr(ps_stl, ps);
-}
-
-void p_rot(double phi, std::vector<double> &ps)
-{
-  double              c, s, t, pz, p, val;
-  std::vector<double> ps1;
-
-  c = cos(phi*M_PI/180e0); s = sin(phi*M_PI/180e0); t = tan(phi*M_PI/180e0);
-  pz = get_p_s(ps);
-
-  if (true) {
-    ps[px_] = s*pz + c*ps[px_];
-  } else {
-    // ps1 = ps; p = c*pz - s*ps1[px_];
-    // px[x_]   = ps1[x_]*pz/p; px[px_] = s*pz + c*ps1[px_];
-    // px[y_]  += ps1[x_]*ps1[py_]*s/p;
-    // px[ct_] += (1e0+ps1[delta_])*ps1[x_]*s/p;
-
-    ps1 = ps; val = 1e0 - ps1[px_]*t/pz;
-    ps[x_]  = ps1[x_]/(c*val);
-    ps[px_] = ps1[px_]*c + s*pz;
-    ps[y_]  = ps1[y_] + t*ps1[x_]*ps1[py_]/(pz*val);
-    ps[ct_] = ps1[ct_] + ps1[x_]*(1e0+ps1[delta_])*t/(pz*val);
-  }
-}
-
-static double get_psi(double irho, double phi, double gap)
-{
-  /* Correction for magnet gap (longitudinal fringe field)
-
-     irho h = 1/rho [1/m]
-     phi  edge angle
-     gap  full gap between poles
-
-     2
-     K1*gap*h*(1 + sin phi)
-     psi = ----------------------- * (1 - K2*g*gap*tan phi)
-     cos phi
-
-     K1 is usually 1/2
-     K2 is zero here                                                  */
-
-  double psi;
-
-  const double k1 = 0.5e0, k2 = 0e0;
-
-  if (phi == 0e0)
-    psi = 0e0;
-  else
-    psi = k1*gap*irho*(1e0+sqr(sin(phi*M_PI/180e0)))/cos(phi*M_PI/180e0)
-      *(1e0 - k2*gap*irho*tan(phi*M_PI/180e0));
-
-  return psi;
-}
-
-void EdgeFocus(const double irho, const double phi, const double gap,
-	       std::vector<double> &ps)
-{
-  ps[px_] += irho*tan(phi*M_PI/180e0)*ps[x_];
-  if (false) {
-    // warning: => diverging Taylor map (see SSC-141)
-    // ps[py_] -=
-    //   irho*tan(phi*M_PI/180e0-get_psi(irho, phi, gap))*ps[y_]
-    //   /(1e0+ps[delta_]);
-    // leading order correction.
-    ps[py_] -=
-      irho*tan(phi*M_PI/180e0-get_psi(irho, phi, gap))*ps[y_]*(1e0-ps[delta_]);
-  } else
-    ps[py_] -= irho*tan(phi*M_PI/180e0-get_psi(irho, phi, gap))*ps[y_];
-}
-
-static void edge_fringe(double ps[], const double inv_rho,
-			const double edge_angle, const double fint,
-			const double gap, const int method, const bool hor)
-{
-  std::vector<double> ps_stl(PS_DIM, 0e0);
-
-  ps_stl = arrtostl(ps);
-  EdgeFocus(inv_rho, edge_angle*180e0/M_PI, gap, ps_stl);
-  stltoarr(ps_stl, ps);
 }
 
 void thin_kick(const int Order, const double MB[], const double L,
@@ -283,18 +167,116 @@ void thin_kick(const int Order, const double MB[], const double L,
   }
 }
 
+static double get_psi(double irho, double phi, double gap)
+{
+  /* Correction for magnet gap (longitudinal fringe field)
+
+     irho h = 1/rho [1/m]
+     phi  edge angle
+     gap  full gap between poles
+
+     2
+     K1*gap*h*(1 + sin phi)
+     psi = ----------------------- * (1 - K2*g*gap*tan phi)
+     cos phi
+
+     K1 is usually 1/2
+     K2 is zero here                                                  */
+
+  double psi;
+
+  const double k1 = 0.5e0, k2 = 0e0;
+
+  if (phi == 0e0)
+    psi = 0e0;
+  else
+    psi = k1*gap*irho*(1e0+sqr(sin(phi*M_PI/180e0)))/cos(phi*M_PI/180e0)
+      *(1e0 - k2*gap*irho*tan(phi*M_PI/180e0));
+
+  return psi;
+}
+
+void EdgeFocus(const double irho, const double phi, const double gap,
+	       std::vector<double> &ps)
+{
+  ps[px_] += irho*tan(phi*M_PI/180e0)*ps[x_];
+  if (false) {
+    // warning: => diverging Taylor map (see SSC-141)
+    // ps[py_] -=
+    //   irho*tan(phi*M_PI/180e0-get_psi(irho, phi, gap))*ps[y_]
+    //   /(1e0+ps[delta_]);
+    // leading order correction.
+    ps[py_] -=
+      irho*tan(phi*M_PI/180e0-get_psi(irho, phi, gap))*ps[y_]*(1e0-ps[delta_]);
+  } else
+    ps[py_] -= irho*tan(phi*M_PI/180e0-get_psi(irho, phi, gap))*ps[y_];
+}
+
+void Drift(double L, std::vector<double> &ps)
+{
+  double u;
+
+  if (true) {
+    // Small angle axproximation.
+    u = L/(1e0+ps[delta_]);
+    ps[x_]  += u*ps[px_]; ps[y_] += u*ps[py_];
+    ps[ct_] += u*(sqr(ps[px_])+sqr(ps[py_]))/(2e0*(1e0+ps[delta_]));
+  } else {
+    u = L/get_p_s(ps);
+    ps[x_]  += u*ps[px_]; ps[y_] += u*ps[py_];
+    ps[ct_] += u*(1e0+ps[delta_]) - L;
+  }
+  if (false) ps[ct_] += L;
+}
+
+void Cav_Pass(const double L, const double f_RF, const double VoE0,
+	      const double phi, std::vector<double> &ps)
+{
+  double delta;
+
+  Drift(L/2e0, ps);
+  if (VoE0 != 0e0) {
+    delta = -VoE0*sin(2e0*M_PI*f_RF/C0*ps[ct_]+phi);
+    ps[delta_] += delta;
+
+    // if (globval.radiation) globval.dE -= is_double<T>::cst(delta);
+
+    // if (globval.pathlength) ps[ct_] -= C->Ph/C->Pfreq*c0;
+  }
+  Drift(L/2e0, ps);
+}
+
+#if 1
+
+inline void fastdrift(double ps[], const double L)
+{
+  std::vector<double> ps_stl = arrtostl(ps);
+
+  Drift(L*(1e0+ps[delta_]), ps_stl);
+  stltoarr(ps_stl, ps);
+}
+
 void strthinkick(double ps[], const double a[], const double b[],
 		 const double L, const int n_max)
 {
   double              bn[2*HOMmax+1];
-  std::vector<double> ps_stl(PS_DIM, 0e0);
+  std::vector<double> ps_stl = arrtostl(ps);
 
   for (int k = n_max+1; k > 0; k--) {
     bn[HOMmax+k] = b[k-1];
     bn[HOMmax-k] = a[k-1];
   }
-  ps_stl = arrtostl(ps);
   thin_kick(n_max+1, bn, L, 0e0, 0e0, ps_stl);
+  stltoarr(ps_stl, ps);
+}
+
+void edge_fringe(double ps[], const double inv_rho,
+		 const double edge_angle, const double fint,
+		 const double gap, const int method, const bool hor)
+{
+  std::vector<double> ps_stl = arrtostl(ps);
+
+  EdgeFocus(inv_rho, edge_angle*180e0/M_PI, gap, ps_stl);
   stltoarr(ps_stl, ps);
 }
 
@@ -302,14 +284,24 @@ void bndthinkick(double ps[], const double a[], const double b[],
 		 const double L, const double irho, const int n_max)
 {
   double              bn[2*HOMmax+1];
-  std::vector<double> ps_stl(PS_DIM, 0e0);
+  std::vector<double> ps_stl = arrtostl(ps);
 
   for (int k = n_max+1; k > 0; k--) {
     bn[HOMmax+k] = b[k-1];
     bn[HOMmax-k] = a[k-1];
   }
-  ps_stl = arrtostl(ps);
   thin_kick(n_max+1, bn, L, irho, irho, ps_stl);
+  stltoarr(ps_stl, ps);
+}
+
+void cav_pass(double ps[], const double L, const double VoE0,
+	      const double f_RF, const double lag)
+{
+  std::vector<double> ps_stl = arrtostl(ps);
+
+  const double phi = -lag*2e0*M_PI*f_RF/C0;
+
+  Cav_Pass(L, f_RF, VoE0, phi, ps_stl);
   stltoarr(ps_stl, ps);
 }
 
@@ -325,6 +317,32 @@ static void fastdrift(double* r, double NormL)
   r[0] += NormL*r[1];
   r[2] += NormL*r[3];
   r[5] += NormL*(r[1]*r[1]+r[3]*r[3])/(2*(1+r[4]));
+}
+
+static void strthinkick(double* r, const double* A, const double* B, double L,
+			int max_order)
+/***************************************************************************** 
+ Calculate and apply a multipole kick to a 6-dimentional
+ phase space vector in a straight element (quadrupole)
+ 
+ IMPORTANT !!!
+ The reference coordinate system is straight but the field expansion may still
+ contain dipole terms: PolynomA(1), PolynomB(1) - in MATLAB notation,
+ A[0], B[0] - C,C++ notation
+ 
+******************************************************************************/
+{
+  int i;
+  double ReSum = B[max_order];
+  double ImSum = A[max_order];
+  double ReSumTemp;
+  for (i = max_order-1; i >= 0; i--) {
+    ReSumTemp = ReSum*r[0] - ImSum*r[2] + B[i];
+    ImSum = ImSum*r[0] +  ReSum*r[2] + A[i];
+    ReSum = ReSumTemp;
+  }
+  r[1] -= L*ReSum;
+  r[3] += L*ImSum;
 }
 
 static void edge_fringe(double r[], const double inv_rho,
@@ -364,32 +382,6 @@ static void edge_fringe(double r[], const double inv_rho,
   r[3] -= r[2]*fy;
 }
 
-static void strthinkick(double* r, const double* A, const double* B, double L,
-			int max_order)
-/***************************************************************************** 
- Calculate and apply a multipole kick to a 6-dimentional
- phase space vector in a straight element (quadrupole)
- 
- IMPORTANT !!!
- The reference coordinate system is straight but the field expansion may still
- contain dipole terms: PolynomA(1), PolynomB(1) - in MATLAB notation,
- A[0], B[0] - C,C++ notation
- 
-******************************************************************************/
-{
-  int i;
-  double ReSum = B[max_order];
-  double ImSum = A[max_order];
-  double ReSumTemp;
-  for (i=max_order-1; i>=0; i--) {
-    ReSumTemp = ReSum*r[0] - ImSum*r[2] + B[i];
-    ImSum = ImSum*r[0] +  ReSum*r[2] + A[i];
-    ReSum = ReSumTemp;
-  }
-  r[1] -=  L*ReSum;
-  r[3] +=  L*ImSum;
-}
-
 static void bndthinkick(double* r, double* A, double* B, double L, double irho,
 			int max_order)
 /***************************************************************************** 
@@ -421,60 +413,39 @@ theta  = --- B
   /* recursively calculate the local transverse magnetic field
    * Bx = ReSum, By = ImSum
    */
-  for (i=max_order-1; i>=0; i--) {
+  for (i = max_order-1; i >= 0; i--) {
     ReSumTemp = ReSum*r[0] - ImSum*r[2] + B[i];
     ImSum = ImSum*r[0] +  ReSum*r[2] + A[i];
     ReSum = ReSumTemp;
   }
-  r[1] -=  L*(ReSum-(r[4]-r[0]*irho)*irho);
-  r[3] +=  L*ImSum;
-  r[5] +=  L*irho*r[0]; /* pathlength */
+  r[1] -= L*(ReSum-(r[4]-r[0]*irho)*irho);
+  r[3] += L*ImSum;
+  r[5] += L*irho*r[0]; /* pathlength */
 }
 
-void CavityPass(double *r_in, double le, double nv, double freq, double lag,
-		int num_particles)
-/* le - physical length
- * nv - peak voltage (V) normalized to the design enegy (eV)
- * r is a 6-by-N matrix of initial conditions reshaped into
- * 1-d array of 6*N elements
- */
-{	int c, c6;
-  double halflength , p_norm, NormL;
-  if(le == 0)
-    {
-      for(c = 0;c<num_particles;c++)
-        {
-	  c6 = c*6;
-	  if(!atIsNaN(r_in[c6]))
-	    r_in[c6+4] += -nv*sin(TWOPI*freq*(r_in[c6+5]-lag)/C0);
-        }
-    }
-  else
-    {
-      halflength = le/2;
-      for(c = 0;c<num_particles;c++)
-        {
-	  c6 = c*6;
-	  if(!atIsNaN(r_in[c6]))
-            {   p_norm = 1/(1+r_in[c6+4]);
-	      NormL  = halflength*p_norm;
-	      /* Prropagate through a drift equal to half cavity length */
-	      r_in[c6+0]+= NormL*r_in[c6+1];
-	      r_in[c6+2]+= NormL*r_in[c6+3];
-	      r_in[c6+5]+=
-		NormL*p_norm*(r_in[c6+1]*r_in[c6+1]+r_in[c6+3]*r_in[c6+3])/2;
-	      /* Longitudinal momentum kick */
-	      r_in[c6+4] += -nv*sin(TWOPI*freq*(r_in[c6+5]-lag)/C0);
-	      p_norm = 1/(1+r_in[c6+4]);
-	      NormL  = halflength*p_norm;
-	      /* Prropagate through a drift equal to half cavity length */
-	      r_in[c6+0]+= NormL*r_in[c6+1];
-	      r_in[c6+2]+= NormL*r_in[c6+3];
-	      r_in[c6+5]+=
-		NormL*p_norm*(r_in[c6+1]*r_in[c6+1]+r_in[c6+3]*r_in[c6+3])/2;
-            }
-        }
-    }
+void cav_pass(double r_in[], const double le, const double nv,
+	      const double freq, const double lag)
+{
+  double p_norm, NormL;
+
+  if (le == 0)
+    r_in[4] += -nv*sin(TWOPI*freq*(r_in[5]-lag)/C0);
+  else {
+    p_norm = 1/(1+r_in[4]);
+    NormL  = le/2*p_norm;
+    /* Prropagate through a drift equal to half cavity length */
+    r_in[0] += NormL*r_in[1];
+    r_in[2] += NormL*r_in[3];
+    r_in[5] += NormL*p_norm*(r_in[1]*r_in[1]+r_in[3]*r_in[3])/2;
+    /* Longitudinal momentum kick */
+    r_in[4] += -nv*sin(TWOPI*freq*(r_in[5]-lag)/C0);
+    p_norm = 1/(1+r_in[4]);
+    NormL  = le/2*p_norm;
+    /* Prropagate through a drift equal to half cavity length */
+    r_in[0] += NormL*r_in[1];
+    r_in[2] += NormL*r_in[3];
+    r_in[5] += NormL*p_norm*(r_in[1]*r_in[1]+r_in[3]*r_in[3])/2;
+  }
 }
 
 #endif
@@ -483,7 +454,6 @@ static void edge_fringe_entrance(double* r, double inv_rho, double edge_angle,
 				 double fint, double gap, int method)
 { edge_fringe(r, inv_rho, edge_angle, fint, gap, method, true); }
 
-
 static void edge_fringe_exit(double* r, double inv_rho, double edge_angle,
 			     double fint, double gap, int method)
 { edge_fringe(r, inv_rho, edge_angle, fint, gap, method, false); }
@@ -491,52 +461,54 @@ static void edge_fringe_exit(double* r, double inv_rho, double edge_angle,
 
 static void QuadFringePassP(double* r, const double b2)
 {
-  /*	x=r[0],px=r[1],y=r[2],py=r[3],delta=r[4],ct=r[5] 
-	Lee-Whiting's thin lens limit formula as given in p. 390 of "Beam Dynamics..."by E. Forest */
-  double u  = b2/(12.0*(1.0+r[4]));
-  double x2 = r[0]*r[0];
-  double z2 = r[2]*r[2];
-  double xz = r[0]*r[2];
-  double gx = u * (x2+3*z2) * r[0];
-  double gz = u * (z2+3*x2) * r[2];
-  double r1tmp=0;
-  double r3tmp=0;
+  /* x=r[0],px=r[1],y=r[2],py=r[3],delta=r[4],ct=r[5]
+     Lee-Whiting's thin lens limit formula as given in p. 390 of "Beam
+     Dynamics..."by E. Forest                                                 */
+  double u     = b2/(12.0*(1.0+r[4]));
+  double x2    = r[0]*r[0];
+  double z2    = r[2]*r[2];
+  double xz    = r[0]*r[2];
+  double gx    = u * (x2+3*z2) * r[0];
+  double gz    = u * (z2+3*x2) * r[2];
+  double r1tmp = 0;
+  double r3tmp = 0;
 
-  r[0]+=gx;
-  r1tmp=3*u*(2*xz*r[3]-(x2+z2)*r[1]);
+  r[0] += gx;
+  r1tmp = 3*u*(2*xz*r[3]-(x2+z2)*r[1]);
    
-  r[2]-=gz;
+  r[2] -= gz;
    
-  r3tmp=3*u*(2*xz*r[1]-(x2+z2)*r[3]);
-  r[5]-=(gz*r[3] - gx*r[1])/(1+r[4]);
+  r3tmp = 3*u*(2*xz*r[1]-(x2+z2)*r[3]);
+  r[5] -= (gz*r[3] - gx*r[1])/(1+r[4]);
    
-  r[1]+=r1tmp;
-  r[3]-=r3tmp;
+  r[1] += r1tmp;
+  r[3] -= r3tmp;
 }
 
 static void QuadFringePassN(double* r, const double b2)
 {
-  /*	x=r[0],px=r[1],y=r[2],py=r[3],delta=r[4],ct=r[5] 
-	Lee-Whiting's thin lens limit formula as given in p. 390 of "Beam Dynamics..."by E. Forest */
-  double u = b2/(12.0*(1.0+r[4]));
-  double x2 = r[0]*r[0];
-  double z2 = r[2]*r[2];
-  double xz = r[0]*r[2];
-  double gx = u * (x2+3*z2) * r[0];
-  double gz = u * (z2+3*x2) * r[2];
-  double r1tmp=0;
-  double r3tmp=0;
+  /* x=r[0],px=r[1],y=r[2],py=r[3],delta=r[4],ct=r[5] 
+     Lee-Whiting's thin lens limit formula as given in p. 390 of "Beam
+     Dynamics..."by E. Forest                                                 */
+  double u     = b2/(12.0*(1.0+r[4]));
+  double x2    = r[0]*r[0];
+  double z2    = r[2]*r[2];
+  double xz    = r[0]*r[2];
+  double gx    = u * (x2+3*z2) * r[0];
+  double gz    = u * (z2+3*x2) * r[2];
+  double r1tmp = 0;
+  double r3tmp = 0;
 
-  r[0]-=gx;
-  r1tmp=3*u*(2*xz*r[3]-(x2+z2)*r[1]);
+  r[0] -= gx;
+  r1tmp = 3*u*(2*xz*r[3]-(x2+z2)*r[1]);
    
-  r[2]+=gz;
+  r[2] += gz;
    
-  r3tmp=3*u*(2*xz*r[1]-(x2+z2)*r[3]);
-  r[5]+=(gz*r[3] - gx*r[1])/(1+r[4]);
+  r3tmp = 3*u*(2*xz*r[1]-(x2+z2)*r[3]);
+  r[5] += (gz*r[3] - gx*r[1])/(1+r[4]);
    
-  r[1]-=r1tmp;
-  r[3]+=r3tmp;
+  r[1] -= r1tmp;
+  r[3] += r3tmp;
 }
 
 /* from elegant code */
@@ -555,7 +527,7 @@ static void quadPartialFringeMatrix(double R[6][6], double K1, double inFringe,
     J2x = inFringe*(K1*fringeInt[2]);
     J3x = inFringe*(K1sqr*(fringeInt[2] + fringeInt[4]));
 
-    K1 = -K1;
+    K1  = -K1;
     J1y = inFringe*(K1*fringeInt[1] - 2*K1sqr*fringeInt[3]/3.);
     J2y = -J2x;
     J3y = J3x;
@@ -564,18 +536,18 @@ static void quadPartialFringeMatrix(double R[6][6], double K1, double inFringe,
     J2x = inFringe*(K1*fringeInt[2]);
     J3x = inFringe*(K1sqr*(fringeInt[4]-fringeInt[0]*fringeInt[1]));
 
-    K1 = -K1;
+    K1  = -K1;
     J1y = inFringe*(K1*fringeInt[1] + K1sqr*fringeInt[0]*fringeInt[2]);
     J2y = -J2x;
     J3y = J3x;
   }
 
-  expJ1x = R[0][0] = exp(J1x);
+  expJ1x  = R[0][0] = exp(J1x);
   R[0][1] = J2x/expJ1x;
   R[1][0] = expJ1x*J3x;
   R[1][1] = (1 + J2x*J3x)/expJ1x;
   
-  expJ1y = R[2][2] = exp(J1y);
+  expJ1y  = R[2][2] = exp(J1y);
   R[2][3] = J2y/expJ1y;
   R[3][2] = expJ1y*J3y;
   R[3][3] = (1 + J2y*J3y)/expJ1y;
@@ -590,7 +562,7 @@ static void linearQuadFringeElegantEntrance
   double *fringeIntM, *fringeIntP;
   double delta, inFringe;
   /* quadrupole linear fringe field, from elegant code */
-  inFringe=-1.0;
+  inFringe = -1.0;
   fringeIntM = fringeIntP0;
   fringeIntP = fringeIntM0;
   delta = r6[4];
@@ -631,7 +603,7 @@ static void linearQuadFringeElegantExit
   r6[2] = R[2][2]*r6[2] + R[2][3]*r6[3];
   r6[3] = R[3][2]*r6[2] + R[3][3]*r6[3];
   /* nonlinear fringe field */
-  QuadFringePassN(r6,b2);   /*This is original AT code*/
+  QuadFringePassN(r6, b2);   /*This is original AT code*/
   /*Linear fringe fields from elegant*/
   inFringe=1.0;
   /* determine and apply second linear matrix, from elegant code */
