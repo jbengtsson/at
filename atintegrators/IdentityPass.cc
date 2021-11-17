@@ -3,31 +3,26 @@
 #include "atphyslib.cc"
 
 
-void IdentityPass(double ps_n[], const double t1[], const double t2[],
-		  const double r1[], const double r2[], const double limits[],
-		  const double *axesptr, const int num_particles)
+void IdentityPass(double *r_in, const double *T1, const double *T2,
+		  const double *R1, const double *R2, const double *limits,
+		  const double *axesptr, int num_particles)
 {	
-  int       j, k;
-  arma::vec ps(PS_DIM);
-
-  for (j = 0; j < num_particles; j++) {	// Loop over particles.
-    for (k = 0; k < PS_DIM; k++)
-      ps(k) = ps_n[j*PS_DIM+k];
-    if (!isnan(ps(0))) {
-      //  misalignment at entrance.
-      if (t1) ps = ps + arrtovec(t1);
-      if (r1) ps = arrtomat(r1)*ps;
-      // Check physical apertures.
-#if 0
+  double *r6;
+  int    c;
+    
+  for (c = 0; c<num_particles; c++) {	/*Loop over particles  */
+    r6 = r_in+c*6;
+    if (!atIsNaN(r6[0])) {
+      /*  misalignment at entrance  */
+      if (T1) ATaddvv(r6, T1);
+      if (R1) ATmultmv(r6, R1);
+      /* Check physical apertures */
       if (limits) checkiflostRectangularAp(r6,limits);
       if (axesptr) checkiflostEllipticalAp(r6,axesptr);
-#endif
-      // Misalignment at exit.
-      if (r2) ps = arrtomat(r2)*ps;
-      if (t2) ps = ps + arrtovec(t2);
+      /* Misalignment at exit */
+      if (R2) ATmultmv(r6, R2);
+      if (T2) ATaddvv(r6, T2);
     }
-    for (k = 0; k < PS_DIM; k++)
-      ps_n[j*PS_DIM+k] = ps(k);
   }
 }
 

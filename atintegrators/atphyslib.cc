@@ -248,6 +248,16 @@ void Cav_Pass(const double L, const double f_RF, const double VoE0,
 
 #if 1
 
+inline void atdrift(double ps[], const double L)
+{
+  std::vector<double> ps_stl(PS_DIM, 0e0);
+
+  ps_stl = arrtostl(ps);
+
+  Drift(L, ps_stl);
+  stltoarr(ps_stl, ps);
+}
+
 inline void fastdrift(double ps[], const double L)
 {
   std::vector<double> ps_stl = arrtostl(ps);
@@ -306,6 +316,17 @@ void cav_pass(double ps[], const double L, const double VoE0,
 }
 
 #else
+
+static void atdrift(double* r, double L)
+/* Input parameter L is the physical length
+   1/(1+delta) normalization is done internally                               */
+{
+  double p_norm = 1/(1+r[4]); 
+  double NormL  = L*p_norm;   
+  r[0]+= NormL*r[1]; 
+  r[2]+= NormL*r[3];
+  r[5]+= NormL*p_norm*(r[1]*r[1]+r[3]*r[3])/2;
+}
 
 static void fastdrift(double* r, double NormL)
 

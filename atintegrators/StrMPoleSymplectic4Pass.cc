@@ -1,7 +1,6 @@
 #include "atelem.cc"
 #include "atlalib.cc"
 #include "atphyslib.cc"
-#include "quadfringe.cc"	/* QuadFringePassP, QuadFringePassN */
 
 #define DRIFT1  0.6756035959798286638
 #define DRIFT2 -0.1756035959798286639
@@ -84,11 +83,9 @@ void StrMPoleSymplectic4Pass
       /*  misalignment at entrance  */
       if (T1) ATaddvv(r6, T1);
       if (R1) ATmultmv(r6, R1);
-#if 0
       /* Check physical apertures at the entrance of the magnet */
       if (RApertures) checkiflostRectangularAp(r6,RApertures);
       if (EApertures) checkiflostEllipticalAp(r6,EApertures);
-#endif
       if (FringeQuadEntrance && B[1] != 0) {
 	if (useLinFrEleEntrance) /*Linear fringe fields from elegant */
 	  linearQuadFringeElegantEntrance(r6, B[1], fringeIntM0, fringeIntP0);

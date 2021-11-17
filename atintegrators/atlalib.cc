@@ -57,17 +57,6 @@ static void ATaddvv(double *r, const double *dr)
     r[i]+=dr[i];
 }     	
 
-static void ATdrift6(double* r, double L)
-/*   Input parameter L is the physical length
-     1/(1+delta) normalization is done internally
-*/
-{	double p_norm = 1/(1+r[4]); 
-  double NormL  = L*p_norm;   
-  r[0]+= NormL*r[1]; 
-  r[2]+= NormL*r[3];
-  r[5]+= NormL*p_norm*(r[1]*r[1]+r[3]*r[3])/2;
-}
-
 static void ATtranspm(double *M)
 {	/* Transpose matrix M	
 	   The result replaces the original matrix 

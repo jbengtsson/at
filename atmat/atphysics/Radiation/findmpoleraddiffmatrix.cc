@@ -12,6 +12,7 @@
 
 #include "atelem.cc"
 #include "atlalib.cc"
+#include "atphyslib.cc"
 
 /* Fourth order-symplectic integrator constants */
 
@@ -396,7 +397,7 @@ static void FindElemB(double *orbit_in, double le, double irho, double *A, doubl
 
 	for(m=0; m < num_int_steps; m++) /* Loop over slices	*/			
 		{		drift_propagateB(orbit_in,L1, BDIFF);
-				ATdrift6(orbit_in,L1);
+				atdrift(orbit_in,L1);
 				
 				thinkickM(orbit_in, A,B, K1, irho, max_order, MKICK);
 				thinkickB(orbit_in, A,B, K1, irho, max_order, E0, BKICK);
@@ -405,7 +406,7 @@ static void FindElemB(double *orbit_in, double le, double irho, double *A, doubl
 				thinkickrad(orbit_in, A, B, K1, irho, E0, max_order);
 		
 				drift_propagateB(orbit_in,L2, BDIFF);
-				ATdrift6(orbit_in,L2);
+				atdrift(orbit_in,L2);
 				
 				thinkickM(orbit_in, A,B, K2, irho, max_order, MKICK);
 				thinkickB(orbit_in, A,B, K2, irho, max_order, E0, BKICK);
@@ -414,7 +415,7 @@ static void FindElemB(double *orbit_in, double le, double irho, double *A, doubl
 				thinkickrad(orbit_in, A, B, K2, irho, E0, max_order);
 	
 				drift_propagateB(orbit_in,L2, BDIFF);
-				ATdrift6(orbit_in,L2);
+				atdrift(orbit_in,L2);
 				
 				thinkickM(orbit_in, A,B, K1, irho, max_order, MKICK);
 				thinkickB(orbit_in, A,B, K1, irho, max_order, E0, BKICK);
@@ -423,7 +424,7 @@ static void FindElemB(double *orbit_in, double le, double irho, double *A, doubl
 				thinkickrad(orbit_in, A, B,  K1, irho, E0, max_order);
 
 				drift_propagateB(orbit_in,L1, BDIFF);
-				ATdrift6(orbit_in,L1);
+				atdrift(orbit_in,L1);
 		}  
 		
     edgefringeB(orbit_in, BDIFF, irho, exit_angle, fringe_int2, full_gap);

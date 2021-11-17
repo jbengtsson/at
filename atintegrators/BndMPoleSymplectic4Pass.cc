@@ -1,7 +1,6 @@
 #include "atelem.cc"
 #include "atlalib.cc"
 #include "atphyslib.cc"
-#include "quadfringe.cc"	/* QuadFringePassP, QuadFringePassN */
 
 #define DRIFT1    0.6756035959798286638
 #define DRIFT2   -0.1756035959798286639
