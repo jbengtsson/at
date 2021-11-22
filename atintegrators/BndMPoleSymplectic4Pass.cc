@@ -7,7 +7,6 @@
 #define KICK1     1.351207191959657328
 #define KICK2    -1.702414383919314656
 
-
 #define SQR(X) ((X)*(X))
 
 

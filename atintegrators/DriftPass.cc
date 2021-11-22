@@ -69,7 +69,6 @@ struct elem_type* init_drift(const atElem *ElemData, struct elem_type *Elem)
   return Elem;
 }
 
-
 struct elem_type*
 trackFunction(const atElem *ElemData, struct elem_type *Elem,
 	      double ps_in[], int num_particles, struct parameters *Param)

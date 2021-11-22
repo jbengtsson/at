@@ -1,9 +1,3 @@
-/* CavityPass.c
- * Accelerator Toolbox
- * Revision 3/10/04
- * A.Terebilo terebilo@ssrl.slac.stanford.edu
- */
-
 #include "atelem.cc"
 #include "atphyslib.cc"
 
