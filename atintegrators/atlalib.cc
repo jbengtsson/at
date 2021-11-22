@@ -1,18 +1,19 @@
-/*   File: atlalib.c
-     Matrix and Vector algebra operations for Accelerator Toolbox
-     A.Terebilo   8/14/00
+/*  File: atlalib.c
+    Matrix and Vector algebra operations for Accelerator Toolbox
+    A.Terebilo   8/14/00
 
+    1. Use mxCalloc, mxMalloc , mxFree for memory allocation/deallocation
+    2. Vector and matrix input arguments are (*double) obtained with
+       mxGetDoubles
 
-     1. Use mxCalloc, mxMalloc , mxFree for memory allocation/deallocation
-     2. Vector and matrix input arguments are (*double) obtained with mxGetDoubles
-     Note: MATLAB internally represents matrixes as column-by-column
-     1-dimentional arrays. For example  
-     A B C
-     D E F         is represented as    A D G B E H C F I
-     G H I
-     3. All matrixes are 6-by-6
-     4. All vectors  are 1-by-6 or 6-by-1
-*/
+    Note: MATLAB internally represents matrixes as column-by-column
+    1-dimentional arrays. For example  
+    A B C
+    D E F         is represented as    A D G B E H C F I
+    G H I
+
+    3. All matrixes are 6-by-6
+    4. All vectors  are 1-by-6 or 6-by-1                                      */
 
 
 static void ATmultmv(double *r, const double* A)

@@ -10,9 +10,9 @@
    radiation integrals', Phys.Rev.E  Vol.49 p.751 (1994)
 */
 
-#include "atelem.cc"
-#include "atlalib.cc"
-#include "atphyslib.cc"
+#include "elem.cc"
+// #include "atlalib.cc"
+#include "physlib.cc"
 
 /* Fourth order-symplectic integrator constants */
 
@@ -478,55 +478,6 @@ static double *diffmatrix(const atElem *ElemData, double *orb, double energy, do
     return bdiff;
 }
 
-
-#if defined(MATLAB_MEX_FILE)
-void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
-/* The calling syntax of this mex-function from MATLAB is
-   FindMPoleRadDiffMatrix(ELEMENT, ORBIT)
-   ELEMENT is the element structure with field names consistent with 
-           a multipole transverse field model.
-   ORBIT is a 6-by-1 vector of the closed orbit at the entrance (calculated elsewhere)
-*/
-{
-
-    mxDouble *orb0;
-    const mxArray *mxElem, *mxOrbit;
-	double *bdiff;
-	double orb[6];
-    double energy;
-    int i, m, n;
-
-    if (nrhs < 2)
-        mexErrMsgIdAndTxt("AT:WrongArg", """findmpoleraddiffmatrix"" needs at least 2 arguments");
-    mxElem = prhs[0];
-    mxOrbit = prhs[1];
-
-	m = mxGetM(mxOrbit);
-	n = mxGetN(mxOrbit);
-	if (!(mxIsDouble(mxOrbit) && (m==6 && n==1)))
-		mexErrMsgIdAndTxt("AT:WrongArg", "Orbit must be a double 6x1 vector");
-
-	orb0 = mxGetDoubles(mxOrbit);
-	/* make local copy of the input closed orbit vector */
-	for (i=0;i<6;i++) orb[i] = orb0[i];
-
-	if (nrhs >= 3) {
-	    const mxArray *mxEnergy = prhs[2];
-	    if (!(mxIsDouble(mxEnergy) && mxIsScalar(mxEnergy)))
-	        mexErrMsgIdAndTxt("AT:WrongArg", "Energy must be a double scalar");
-	    energy=mxGetScalar(mxEnergy);
-	}
-    else {
-        energy=mxGetNaN();
-    }
-	/* ALLOCATE memory for the output array */
-	plhs[0] = mxCreateDoubleMatrix(6,6,mxREAL);
-	bdiff = mxGetDoubles(plhs[0]);
-    for (i=0; i<36; i++) bdiff[i]=0.0;
-    
-    diffmatrix(mxElem, orb, energy, bdiff);
-}
-#endif /*MATLAB_MEX_FILE*/
 
 #if defined(PYAT)
 
