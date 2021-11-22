@@ -7,32 +7,8 @@
 #define KICK1   1.351207191959657328
 #define KICK2  -1.702414383919314656
 
-struct elem
-{
-  double
-  Length,
-    *PolynomA,
-    *PolynomB;
-  int
-  MaxOrder,
-    NumIntSteps,
-  /* Optional fields */
-    FringeQuadEntrance,
-    FringeQuadExit;
-  double
-  *fringeIntM0,
-    *fringeIntP0,
-    *R1,
-    *R2,
-    *T1,
-    *T2,
-    *RApertures,
-    *EApertures,
-    *KickAngle;
-};
 
-
-void StrMPoleSymplectic4Pass
+void MpolePass
 (double *ps_n, double le, double *A, double *B, int max_order,
  int num_int_steps, int FringeQuadEntrance, int FringeQuadExit,
  /* 0 (no fringe), 1 (lee-whiting) or 2 (lee-whiting+elegant-like) */
@@ -122,84 +98,89 @@ void StrMPoleSymplectic4Pass
   }
 }
 
-
-#if defined(MATLAB_MEX_FILE) || defined(PYAT)
-ExportMode struct elem*
-trackFunction(const atElem *ElemData,struct elem *Elem, double *r_in,
-	      int num_particles, struct parameters *Param)
+struct elem_type* init_mpole(const atElem *ElemData, struct elem_type *Elem)
 {
-  if (!Elem) {
-    int
-      MaxOrder,
-      NumIntSteps,
-      FringeQuadEntrance,
-      FringeQuadExit;
-    double
-      Length,
-      *PolynomA,
-      *PolynomB,
-      *R1,
-      *R2,
-      *T1,
-      *T2,
-      *EApertures,
-      *RApertures,
-      *fringeIntM0,
-      *fringeIntP0,
-      *KickAngle;
+  int
+    MaxOrder, NumIntSteps, FringeQuadEntrance, FringeQuadExit;
+  double
+    Length, *PolynomA, *PolynomB, *R1, *R2, *T1, *T2, *EApertures,
+    *RApertures, *fringeIntM0, *fringeIntP0, *KickAngle;
+  elem_mpole *mpole;
 
-    Length = atGetDouble(ElemData, (char*)"Length"); check_error();
-    PolynomA = atGetDoubleArray(ElemData, (char*)"PolynomA"); check_error();
-    PolynomB = atGetDoubleArray(ElemData, (char*)"PolynomB"); check_error();
-    MaxOrder = atGetLong(ElemData, (char*)"MaxOrder"); check_error();
-    NumIntSteps = atGetLong(ElemData, (char*)"NumIntSteps"); check_error();
-    /*optional fields*/
-    FringeQuadEntrance =
-      atGetOptionalLong(ElemData, (char*)"FringeQuadEntrance", 0);
-    FringeQuadExit = atGetOptionalLong(ElemData, (char*)"FringeQuadExit", 0);
-    fringeIntM0 = atGetOptionalDoubleArray(ElemData, (char*)"fringeIntM0");
-    check_error();
-    fringeIntP0 = atGetOptionalDoubleArray(ElemData, (char*)"fringeIntP0");
-    check_error();
-    R1 = atGetOptionalDoubleArray(ElemData, (char*)"R1"); check_error();
-    R2 = atGetOptionalDoubleArray(ElemData, (char*)"R2"); check_error();
-    T1 = atGetOptionalDoubleArray(ElemData, (char*)"T1"); check_error();
-    T2 = atGetOptionalDoubleArray(ElemData, (char*)"T2"); check_error();
-    EApertures = atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
-    check_error();
-    RApertures = atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
-    check_error();
-    KickAngle = atGetOptionalDoubleArray(ElemData, (char*)"KickAngle");
-    check_error();
+  Elem            = (struct elem_type*)malloc(sizeof(struct elem_type));
+  Elem->mpole_ptr = (struct elem_mpole*)malloc(sizeof(struct elem_mpole));
+  mpole           = Elem->mpole_ptr;
+
+  Length = atGetDouble(ElemData, (char*)"Length");
+  check_error();
+  PolynomA = atGetDoubleArray(ElemData, (char*)"PolynomA");
+  check_error();
+  PolynomB = atGetDoubleArray(ElemData, (char*)"PolynomB");
+  check_error();
+  MaxOrder = atGetLong(ElemData, (char*)"MaxOrder");
+  check_error();
+  NumIntSteps = atGetLong(ElemData, (char*)"NumIntSteps");
+  check_error();
+  /*optional fields*/
+  FringeQuadEntrance =
+    atGetOptionalLong(ElemData, (char*)"FringeQuadEntrance", 0);
+  FringeQuadExit = atGetOptionalLong(ElemData, (char*)"FringeQuadExit", 0);
+  fringeIntM0 = atGetOptionalDoubleArray(ElemData, (char*)"fringeIntM0");
+  check_error();
+  fringeIntP0 = atGetOptionalDoubleArray(ElemData, (char*)"fringeIntP0");
+  check_error();
+  R1 = atGetOptionalDoubleArray(ElemData, (char*)"R1");
+  check_error();
+  R2 = atGetOptionalDoubleArray(ElemData, (char*)"R2");
+  check_error();
+  T1 = atGetOptionalDoubleArray(ElemData, (char*)"T1");
+  check_error();
+  T2 = atGetOptionalDoubleArray(ElemData, (char*)"T2");
+  check_error();
+  EApertures = atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
+  check_error();
+  RApertures = atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
+  check_error();
+  KickAngle = atGetOptionalDoubleArray(ElemData, (char*)"KickAngle");
+  check_error();
         
-    Elem  =  (struct elem*)atMalloc(sizeof(struct elem));
-    Elem->Length = Length;
-    Elem->PolynomA = PolynomA;
-    Elem->PolynomB = PolynomB;
-    Elem->MaxOrder = MaxOrder;
-    Elem->NumIntSteps = NumIntSteps;
-    /*optional fields*/
-    Elem->FringeQuadEntrance = FringeQuadEntrance;
-    Elem->FringeQuadExit = FringeQuadExit;
-    Elem->fringeIntM0 = fringeIntM0;
-    Elem->fringeIntP0 = fringeIntP0;
-    Elem->R1 = R1;
-    Elem->R2 = R2;
-    Elem->T1 = T1;
-    Elem->T2 = T2;
-    Elem->EApertures = EApertures;
-    Elem->RApertures = RApertures;
-    Elem->KickAngle = KickAngle;
-  }
-  StrMPoleSymplectic4Pass
-    (r_in, Elem->Length, Elem->PolynomA, Elem->PolynomB, 
-     Elem->MaxOrder, Elem->NumIntSteps, Elem->FringeQuadEntrance, 
-     Elem->FringeQuadExit, Elem->fringeIntM0, Elem->fringeIntP0, 
-     Elem->T1, Elem->T2, Elem->R1, Elem->R2, 
-     Elem->RApertures, Elem->EApertures, Elem->KickAngle, num_particles);
+  Elem->Length              = Length;
+  Elem->R1                  = R1;
+  Elem->R2                  = R2;
+  Elem->T1                  = T1;
+  Elem->T2                  = T2;
+  Elem->EApertures          = EApertures;
+  Elem->RApertures          = RApertures;
+
+  mpole->PolynomA           = PolynomA;
+  mpole->PolynomB           = PolynomB;
+  mpole->MaxOrder           = MaxOrder;
+  mpole->NumIntSteps        = NumIntSteps;
+  mpole->FringeQuadEntrance = FringeQuadEntrance;
+  mpole->FringeQuadExit     = FringeQuadExit;
+  mpole->fringeIntM0        = fringeIntM0;
+  mpole->fringeIntP0        = fringeIntP0;
+  mpole->KickAngle          = KickAngle;
+
   return Elem;
 }
 
-MODULE_DEF(StrMPoleSymplectic4Pass) /* Dummy module initialisation */
+struct elem_type*
+trackFunction(const atElem *ElemData, struct elem_type *Elem, double *r_in,
+	      int num_particles, struct parameters *Param)
+{
+  elem_mpole *mpole;
 
-#endif /*defined(MATLAB_MEX_FILE) || defined(PYAT)*/
+  if (!Elem) Elem = init_mpole(ElemData, Elem);
+
+  mpole = Elem->mpole_ptr;
+
+  MpolePass
+    (r_in, Elem->Length, mpole->PolynomA, mpole->PolynomB, 
+     mpole->MaxOrder, mpole->NumIntSteps, mpole->FringeQuadEntrance, 
+     mpole->FringeQuadExit, mpole->fringeIntM0, mpole->fringeIntP0, 
+     Elem->T1, Elem->T2, Elem->R1, Elem->R2, 
+     Elem->RApertures, Elem->EApertures, mpole->KickAngle, num_particles);
+
+  return Elem;
+}

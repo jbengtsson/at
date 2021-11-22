@@ -50,6 +50,74 @@ enum MpoleKind
     Dec    = 5,
     Dodec  = 6 };
 
+struct elem_id { };
+
+struct elem_drift { };
+
+struct elem_mpole
+{
+  int
+    MaxOrder,
+    NumIntSteps,
+    FringeQuadEntrance,
+    FringeQuadExit;
+  double
+    *PolynomA,
+    *PolynomB,
+    *fringeIntM0,
+    *fringeIntP0,
+    *KickAngle;
+};
+
+struct elem_bend {
+  int
+    MaxOrder,
+    NumIntSteps,
+    FringeBendEntrance,
+    FringeBendExit,
+    FringeQuadEntrance,
+    FringeQuadExit;
+  double
+    *PolynomA,
+    *PolynomB,
+    BendingAngle,
+    EntranceAngle,
+    ExitAngle,
+    FringeInt1,
+    FringeInt2,
+    FullGap,
+    *fringeIntM0,
+    *fringeIntP0,
+    *KickAngle;    
+};
+
+struct elem_cav {
+  double
+    Voltage,
+    Energy,
+    Frequency,
+    TimeLag;
+};
+
+struct elem_type {
+  double
+    Length,
+    *R1,
+    *R2,
+    *T1,
+    *T2,
+    *EApertures,
+    *RApertures;
+  union {
+    elem_id    *id_ptr;
+    elem_drift *drift_ptr;
+    elem_mpole *mpole_ptr;
+    elem_bend  *bend_ptr;
+    elem_cav   *cav_ptr;
+  };
+};
+
+
 double C_u, C_gamma, C_q, cl_rad, q_fluct;
 
 

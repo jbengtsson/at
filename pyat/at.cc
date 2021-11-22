@@ -49,16 +49,16 @@ typedef PyObject atElem;
 #define LIMIT_AMPLITUDE		1
 
 /* define the general signature of a pass function */
-typedef struct elem*
-(*track_function)(const PyObject *element, struct elem *elemptr, double *r_in,
-		  int num_particles, struct parameters *param);
+typedef union elem*
+(*track_function)(const PyObject *element, union elem *elemptr,
+		  double *r_in, int num_particles, struct parameters *param);
 
-static npy_uint32     num_elements = 0;
-static struct elem    **elemdata_list = NULL;
-static PyObject       **element_list = NULL;
-static track_function *integrator_list = NULL;
+static npy_uint32     num_elements        = 0;
+static union elem **elemdata_list     = NULL;
+static PyObject       **element_list      = NULL;
+static track_function *integrator_list    = NULL;
 static PyObject       **pyintegrator_list = NULL;
-static PyObject       **kwargs_list = NULL;
+static PyObject       **kwargs_list       = NULL;
 static char           integrator_path[300];
 
 /* Directly copied from atpass.c */
@@ -237,7 +237,7 @@ static PyObject* Buildkwargs(const atElem *ElemData)
   PyObject *kwargs;
 
   kwargs = PyDict_New();
-  PyDict_SetItemString(kwargs,(char *)"elem",(PyObject *)ElemData);
+  PyDict_SetItemString(kwargs, (char *)"elem", (PyObject *)ElemData);
   return kwargs;
 }
 
@@ -352,32 +352,33 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     *lattice;
   PyArrayObject
     *rin,
-    *refs = NULL;
+    *refs           = NULL;
   PyObject
     *rout,
-    *xnturn = NULL,
-    *xnelem = NULL,
-    *xlost = NULL,
-    *xlostcoord = NULL;
+    *xnturn         = NULL,
+    *xnelem         = NULL,
+    *xlost          = NULL,
+    *xlostcoord     = NULL;
   int
     turn,
-    *ixnturn = NULL,
-    *ixnelem = NULL,
+    *ixnturn        = NULL,
+    *ixnelem        = NULL,
     num_turns;
   bool
-    *bxlost = NULL;
+    *bxlost         = NULL;
   double
     *drin,
     *drout,
-    *dxlostcoord = NULL;
+    *dxlostcoord    = NULL;
   npy_uint32
-    omp_num_threads=0,
-    num_particles, np6,
+    omp_num_threads = 0,
+    num_particles,
+    np6,
     elem_index,
-    *refpts = NULL,
+    *refpts         = NULL,
     nextref,
-    keep_lattice=0,
-    losses=0;
+    keep_lattice    = 0,
+    losses          = 0;
   unsigned int
     nextrefindex,
     num_refpts;
@@ -486,7 +487,8 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
 
     /* Pointer to Element structures used by the tracking function */
     free(elemdata_list);
-    elemdata_list = (struct elem **)calloc(num_elements, sizeof(struct elem *));
+    elemdata_list =
+      (union elem **)calloc(num_elements, sizeof(union elem *));
 
     /* Pointer to Element list, make sure all pointers are initially NULL */
     free(element_list);
@@ -543,7 +545,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     track_function *integrator = integrator_list;
     PyObject       **pyintegrator = pyintegrator_list;
     PyObject       **kwargs = kwargs_list;
-    struct elem    **elemdata = elemdata_list;
+    union elem **elemdata = elemdata_list;
 
     param.nturn = turn;
     nextrefindex = 0;
@@ -665,7 +667,7 @@ static PyObject *at_elempass(PyObject *self, PyObject *args)
     if (!kwargs) return NULL;
     Py_DECREF(kwargs);
   } else {
-    struct elem *elem_data =
+    union elem *elem_data =
       integrator(element, NULL, drin, num_particles, &param);
 
     if (!elem_data) return NULL;

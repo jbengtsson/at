@@ -5,11 +5,8 @@
 #define OMP_PARTICLE_THRESHOLD (10)
 #endif
 
-struct elem;
-
-struct parameters
-{
-  int nturn;
+struct parameters {
+  int    nturn;
   double RingLength;
   double T0;
 };

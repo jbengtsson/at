@@ -3,18 +3,6 @@
 #include "atphyslib.cc"
 
 
-struct elem {
-  double
-  Length,
-    *R1,
-    *R2,
-    *T1,
-    *T2,
-    *EApertures,
-    *RApertures;
-};
-
-
 void DriftPass(double *r_in, double le, const double *T1, const double *T2,
 	       const double *R1, const double *R2, double *RApertures,
 	       double *EApertures, int num_particles)
@@ -47,43 +35,49 @@ void DriftPass(double *r_in, double le, const double *T1, const double *T2,
   }
 }
 
-
-struct elem*
-trackFunction(const atElem *ElemData,struct elem *Elem, double ps_in[],
-	      int num_particles, struct parameters *Param)
+struct elem_type* init_drift(const atElem *ElemData, struct elem_type *Elem)
 {
-  /*  if (ElemData) {*/
-  if (!Elem) {
-    double Length;
-    double *R1, *R2, *T1, *T2, *EApertures, *RApertures;
-    Length=atGetDouble(ElemData,"Length"); check_error();
-    R1=atGetOptionalDoubleArray(ElemData, (char*)"R1"); check_error();
-    R2=atGetOptionalDoubleArray(ElemData, (char*)"R2"); check_error();
-    T1=atGetOptionalDoubleArray(ElemData, (char*)"T1"); check_error();
-    T2=atGetOptionalDoubleArray(ElemData, (char*)"T2"); check_error();
-    EApertures=atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
-    check_error();
-    RApertures=atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
-    check_error();
-    Elem = (struct elem*)atMalloc(sizeof(struct elem));
-    Elem->Length=Length;
-    Elem->R1=R1;
-    Elem->R2=R2;
-    Elem->T1=T1;
-    Elem->T2=T2;
-    Elem->EApertures=EApertures;
-    Elem->RApertures=RApertures;
-  }
+  double
+    Length, *R1, *R2, *T1, *T2, *EApertures, *RApertures;
+
+  Elem            = (struct elem_type*)malloc(sizeof(struct elem_type));
+  Elem->drift_ptr = (struct elem_drift*)malloc(sizeof(struct elem_drift));
+
+  Length     = atGetDouble(ElemData, "Length");
+  check_error();
+  R1         = atGetOptionalDoubleArray(ElemData, (char*)"R1");
+  check_error();
+  R2         = atGetOptionalDoubleArray(ElemData, (char*)"R2");
+  check_error();
+  T1         = atGetOptionalDoubleArray(ElemData, (char*)"T1");
+  check_error();
+  T2         = atGetOptionalDoubleArray(ElemData, (char*)"T2");
+  check_error();
+  EApertures = atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
+  check_error();
+  RApertures = atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
+  check_error();
+
+  Elem->Length     = Length;
+  Elem->R1         = R1;
+  Elem->R2         = R2;
+  Elem->T1         = T1;
+  Elem->T2         = T2;
+  Elem->EApertures = EApertures;
+  Elem->RApertures = RApertures;
+
+  return Elem;
+}
+
+
+struct elem_type*
+trackFunction(const atElem *ElemData, struct elem_type *Elem,
+	      double ps_in[], int num_particles, struct parameters *Param)
+{
+  if (!Elem) Elem = init_drift(ElemData, Elem);
+
   DriftPass(ps_in, Elem->Length, Elem->T1, Elem->T2, Elem->R1, Elem->R2,
 	    Elem->RApertures, Elem->EApertures, num_particles);
-  /*  }
-      else {
-      atFree(Elem->T1);
-      atFree(Elem->T2);
-      atFree(Elem->R1);
-      atFree(Elem->R2);
-      atFree(Elem->EApertures);
-      atFree(Elem->RApertures);
-      }*/
+
   return Elem;
 }

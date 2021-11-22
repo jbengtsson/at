@@ -26,41 +26,45 @@ void IdentityPass(double *r_in, const double *T1, const double *T2,
   }
 }
 
-
-struct elem {
-  double
-    *R1,
-    *R2,
-    *T1,
-    *T2,
-    *EApertures,
-    *RApertures;
-};
-
-
-struct elem*
-trackFunction(const atElem *ElemData, struct elem *Elem, double ps_in[],
-	      int num_particles, struct parameters *Param)
+struct elem_type* init_id(const atElem *ElemData, struct elem_type *Elem)
 {
-  if (!Elem) {
-    double *R1, *R2, *T1, *T2, *EApertures, *RApertures;
-    R1 = atGetOptionalDoubleArray(ElemData, (char*)"R1"); check_error();
-    R2 = atGetOptionalDoubleArray(ElemData, (char*)"R2"); check_error();
-    T1 = atGetOptionalDoubleArray(ElemData, (char*)"T1"); check_error();
-    T2 = atGetOptionalDoubleArray(ElemData, (char*)"T2"); check_error();
-    EApertures = atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
-    check_error();
-    RApertures = atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
-    check_error();
-    Elem = (struct elem*)atMalloc(sizeof(struct elem));
-    Elem->R1 = R1;
-    Elem->R2 = R2;
-    Elem->T1 = T1;
-    Elem->T2 = T2;
-    Elem->EApertures = EApertures;
-    Elem->RApertures = RApertures;
-  }
+  double    *R1, *R2, *T1, *T2, *EApertures, *RApertures;
+
+  Elem         = (struct elem_type*)malloc(sizeof(struct elem_type));
+  Elem->id_ptr = (struct elem_id*)malloc(sizeof(struct elem_id));
+
+  R1         = atGetOptionalDoubleArray(ElemData, (char*)"R1");
+  check_error();
+  R2         = atGetOptionalDoubleArray(ElemData, (char*)"R2");
+  check_error();
+  T1         = atGetOptionalDoubleArray(ElemData, (char*)"T1");
+  check_error();
+  T2         = atGetOptionalDoubleArray(ElemData, (char*)"T2");
+  check_error();
+  EApertures = atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
+  check_error();
+  RApertures = atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
+  check_error();
+
+  Elem->Length     = 0e0;
+  Elem->R1         = R1;
+  Elem->R2         = R2;
+  Elem->T1         = T1;
+  Elem->T2         = T2;
+  Elem->EApertures = EApertures;
+  Elem->RApertures = RApertures;
+
+  return Elem;
+}
+
+struct elem_type*
+trackFunction(const atElem *ElemData, struct elem_type *Elem,
+	      double ps_in[], int num_particles, struct parameters *Param)
+{
+  if (!Elem) Elem = init_id(ElemData, Elem);
+
   IdentityPass(ps_in, Elem->T1, Elem->T2, Elem->R1, Elem->R2, 
 	       Elem->RApertures, Elem->EApertures, num_particles);
+
   return Elem;
 }

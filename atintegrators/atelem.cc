@@ -269,8 +269,8 @@ static double* atGetOptionalDoubleArray(const PyObject *element, char *name)
 #define C_LINK
 #endif
 
-C_LINK ExportMode struct elem*
-trackFunction(const atElem *ElemData, struct elem *Elem, double *r_in,
+C_LINK ExportMode struct elem_type*
+trackFunction(const atElem *ElemData,struct elem_type *Elem, double *r_in,
 	      int num_particles, struct parameters *Param);
 
 #endif /* defined(PYAT) || defined(MATLAB_MEX_FILE) */
