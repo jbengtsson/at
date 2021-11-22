@@ -11,30 +11,6 @@
 /*            For the integrator code                 */
 /*----------------------------------------------------*/
 
-#if defined(MATLAB_MEX_FILE)
-
-#define atIsFinite mxIsFinite
-#define atIsNaN mxIsNaN
-#define atGetNaN mxGetNaN
-#define atGetInf mxGetInf
-#define atFree mxFree
-
-static void* atMalloc(size_t size)
-{
-  void *ptr = mxMalloc(size);
-  mexMakeMemoryPersistent(ptr);
-  return ptr;
-}
-
-static void* atCalloc(size_t count, size_t size)
-{
-  void *ptr = mxCalloc(count, size);
-  mexMakeMemoryPersistent(ptr);
-  return ptr;
-}
-
-#else /* !defined(MATLAB_MEX_FILE) */
-
 #define atIsFinite isfinite
 #define atIsNaN isnan
 #define atGetNaN() (NAN)
@@ -43,92 +19,6 @@ static void* atCalloc(size_t count, size_t size)
 #define atCalloc calloc
 #define atFree free
 
-#endif /* MATLAB_MEX_FILE */
-
-/*----------------------------------------------------*/
-/*            For the Matlab interface                */
-/*----------------------------------------------------*/
-
-#if defined(MATLAB_MEX_FILE)
-
-typedef mxArray atElem;
-#define check_error()
-
-static long atGetLong(const mxArray *ElemData, const char *fieldname)
-{
-  mxArray* field=mxGetField(ElemData,0,fieldname);
-  if (!field)
-    mexErrMsgIdAndTxt("AT:WrongArg", "The required attribute %s is missing.",
-		      fieldname);
-  return (long)mxGetScalar(field);
-}
-
-static double atGetDouble(const mxArray *ElemData, const char *fieldname)
-{
-  mxArray *field=mxGetField(ElemData,0,fieldname);
-  if (!field)
-    mexErrMsgIdAndTxt("AT:WrongArg", "The required attribute %s is missing.",
-		      fieldname);
-  return mxGetScalar(field);
-}
-
-static double*
-atGetDoubleArraySz(const mxArray *ElemData, const char *fieldname, int *msz,
-		   int *nsz)
-{
-  mxArray *field=mxGetField(ElemData,0,fieldname);
-  if (!field)
-    mexErrMsgIdAndTxt("AT:WrongArg", "The required attribute %s is missing.",
-		      fieldname);
-  *msz = mxGetM(field);  /*Number of rows in the 2-D array*/
-  *nsz = mxGetN(field);  /*Number of columns in the 2-D array.*/
-  return mxGetDoubles(field);
-}
-
-static double* atGetDoubleArray(const mxArray *ElemData, const char *fieldname)
-{
-  int msz, nsz;
-  return atGetDoubleArraySz(ElemData, fieldname, &msz, &nsz);
-}
-
-static long
-atGetOptionalLong(const mxArray *ElemData, const char *fieldname,
-		  long default_value)
-{
-  mxArray *field=mxGetField(ElemData,0,fieldname);
-  return (field) ? (long)mxGetScalar(field) : default_value;
-}
-
-static double
-atGetOptionalDouble(const mxArray *ElemData, const char *fieldname,
-		    double default_value)
-{
-  mxArray *field=mxGetField(ElemData,0,fieldname);
-  return (field) ? mxGetScalar(field) : default_value;
-}
-
-static double*
-atGetOptionalDoubleArraySz(const mxArray *ElemData, const char *fieldname,
-			   int *msz, int *nsz)
-{
-  double *ptr = NULL;
-  mxArray *field=mxGetField(ElemData,0,fieldname);
-  if (field) {
-    *msz = mxGetM(field);
-    *nsz = mxGetN(field);
-    ptr = mxGetDoubles(field);
-  }
-  return ptr;
-}
-
-static double*
-atGetOptionalDoubleArray(const mxArray *ElemData, const char *fieldname)
-{
-  int msz, nsz;
-  return atGetOptionalDoubleArraySz(ElemData, fieldname, &msz, &nsz);
-}
-
-#endif /* MATLAB_MEX_FILE */
 
 /*----------------------------------------------------*/
 /*            For the Python interface                */
@@ -270,7 +160,7 @@ static double* atGetOptionalDoubleArray(const PyObject *element, char *name)
 #endif
 
 C_LINK ExportMode struct elem_type*
-trackFunction(const atElem *ElemData,struct elem_type *Elem, double *r_in,
+trackFunction(const atElem *ElemData, struct elem_type *Elem, double *r_in,
 	      int num_particles, struct parameters *Param);
 
 #endif /* defined(PYAT) || defined(MATLAB_MEX_FILE) */
