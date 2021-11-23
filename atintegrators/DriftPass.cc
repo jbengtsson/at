@@ -1,5 +1,5 @@
 #include "elem.cc"
-#include "atlalib.cc"
+#include "tracy-2.cc"
 
 
 struct elem_type* init_drift(const atElem *ElemData, struct elem_type *Elem)
@@ -68,8 +68,8 @@ void DriftPass(double *ps, const int num_particles,
 }
 
 struct elem_type*
-trackFunction(const atElem *ElemData, struct elem_type *Elem,
-	      double ps[], int num_particles, struct parameters *Param)
+trackFunction(const atElem *ElemData, struct elem_type *Elem, double ps[],
+	      const int num_particles, const struct parameters *Param)
 {
   if (!Elem) Elem = init_drift(ElemData, Elem);
   DriftPass(ps, num_particles, Elem);

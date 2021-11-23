@@ -11,7 +11,7 @@
 */
 
 #include "elem.cc"
-#include "atlalib.cc"
+#include "tracy-2.cc"
 
 /* Fourth order-symplectic integrator constants */
 
@@ -28,9 +28,6 @@
 #define LAMBDABAR 3.86159323e-13	/* Compton wavelength/2pi [m]    */
 #define CER   	  2.81794092e-15	/* Classical electron radius [m] */
 #define CU        1.323094366892892	/* 55/(24*sqrt(3)) factor        */
-
-
-#define SQR(X) ((X)*(X))
 
 
 static void edgefringeB(double* r, double *B, double inv_rho, double edge_angle,

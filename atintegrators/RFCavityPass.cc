@@ -1,6 +1,5 @@
 #include "elem.cc"
-#include "elem.cc"
-#include "atlalib.cc"
+#include "tracy-2.cc"
 
 
 struct elem_type* init_cav(const atElem *ElemData, struct elem_type *Elem)
@@ -44,8 +43,8 @@ void CavityPass(double ps[], const int num_particles,
 }
 
 struct elem_type*
-trackFunction(const atElem *ElemData, struct elem_type *Elem,
-	      double *ps, int num_particles, struct parameters *Param)
+trackFunction(const atElem *ElemData, struct elem_type *Elem, double *ps,
+	      const int num_particles, const struct parameters *Param)
 {
   if (!Elem) Elem = init_cav(ElemData, Elem);
   CavityPass(ps, num_particles, Elem);
