@@ -705,7 +705,6 @@ static void linearQuadFringeElegantEntrance
   r6[3] = R[3][2]*r6[2] + R[3][3]*r6[3];
 }
 
-
 static void linearQuadFringeElegantExit
 (double* r6, double b2, double *fringeIntM0, double *fringeIntP0)
 {
