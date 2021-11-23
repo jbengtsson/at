@@ -12,7 +12,6 @@
 
 #include "elem.cc"
 #include "atlalib.cc"
-#include "physlib.cc"
 
 /* Fourth order-symplectic integrator constants */
 

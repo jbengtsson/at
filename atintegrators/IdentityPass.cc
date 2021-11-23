@@ -1,6 +1,5 @@
 #include "elem.cc"
 #include "atlalib.cc"
-#include "physlib.cc"
 
 
 struct elem_type* init_id(const atElem *ElemData, struct elem_type *Elem)
