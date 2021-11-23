@@ -1,23 +1,7 @@
 #include "elem.cc"
+#include "atlalib.cc"
 #include "physlib.cc"
 
-
-void CavityPass(double r_in[], const double le, const double nv,
-		const double freq, const double lag, const int num_particles)
-/* le - physical length
- * nv - peak voltage (V) normalized to the design enegy (eV)
- * r is a 6-by-N matrix of initial conditions reshaped into
- * 1-d array of 6*N elements
- */
-{
-  int c, c6;
-
-  for(c = 0; c < num_particles; c++) {
-    c6 = c*6;
-    if(!atIsNaN(r_in[c6]))
-      cav_pass(&r_in[c6], le, nv, freq, lag);
-  }
-}
 
 struct elem_type* init_cav(const atElem *ElemData, struct elem_type *Elem)
 {
@@ -34,27 +18,36 @@ struct elem_type* init_cav(const atElem *ElemData, struct elem_type *Elem)
   Frequency = atGetDouble(ElemData,"Frequency"); check_error();
   TimeLag   = atGetOptionalDouble(ElemData,"TimeLag",0); check_error();
 
-  Elem->Length    = Length;
-  cav->Voltage    = Voltage;
-  cav->Energy     = Energy;
-  cav->Frequency  = Frequency;
-  cav->TimeLag    = TimeLag;
+  Elem->Length   = Length;
+  cav->Voltage   = Voltage;
+  cav->Energy    = Energy;
+  cav->Frequency = Frequency;
+  cav->TimeLag   = TimeLag;
 
   return Elem;
 }
 
+void CavityPass(double ps[], const int num_particles,
+		const struct elem_type *Elem)
+{
+  int    k;
+  double *ps_vec;
+
+  const elem_cav *cav = Elem->cav_ptr;
+
+  for(k = 0; k < num_particles; k++) {
+    ps_vec = ps+k*6;
+    if(!atIsNaN(ps_vec[0]))
+      cav_pass(ps_vec,  Elem->Length, cav->Voltage, cav->Frequency,
+	       cav->TimeLag);
+  }
+}
+
 struct elem_type*
 trackFunction(const atElem *ElemData, struct elem_type *Elem,
-	      double *r_in, int num_particles, struct parameters *Param)
+	      double *ps, int num_particles, struct parameters *Param)
 {
-  elem_cav *cav;
-
   if (!Elem) Elem = init_cav(ElemData, Elem);
-
-  cav = Elem->cav_ptr;
-
-  CavityPass(r_in, Elem->Length, cav->Voltage/cav->Energy, cav->Frequency,
-	     cav->TimeLag, num_particles);
-
+  CavityPass(ps, num_particles, Elem);
   return Elem;
 }

@@ -6,6 +6,7 @@
 #define ATELEM_C
 
 #include "atcommon.h"
+#include "elem.h"
 
 /*----------------------------------------------------*/
 /*            For the integrator code                 */
