@@ -31,14 +31,17 @@ struct elem_type* init_mpole(const atElem *ElemData, struct elem_type *Elem)
   check_error();
   NumIntSteps = atGetLong(ElemData, (char*)"NumIntSteps");
   check_error();
-  /*optional fields*/
+
   FringeQuadEntrance =
     atGetOptionalLong(ElemData, (char*)"FringeQuadEntrance", 0);
+  check_error();
   FringeQuadExit = atGetOptionalLong(ElemData, (char*)"FringeQuadExit", 0);
+  check_error();
   fringeIntM0 = atGetOptionalDoubleArray(ElemData, (char*)"fringeIntM0");
   check_error();
   fringeIntP0 = atGetOptionalDoubleArray(ElemData, (char*)"fringeIntP0");
   check_error();
+
   R1 = atGetOptionalDoubleArray(ElemData, (char*)"R1");
   check_error();
   R2 = atGetOptionalDoubleArray(ElemData, (char*)"R2");
@@ -47,6 +50,7 @@ struct elem_type* init_mpole(const atElem *ElemData, struct elem_type *Elem)
   check_error();
   T2 = atGetOptionalDoubleArray(ElemData, (char*)"T2");
   check_error();
+
   EApertures = atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
   check_error();
   RApertures = atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
@@ -66,6 +70,7 @@ struct elem_type* init_mpole(const atElem *ElemData, struct elem_type *Elem)
   mpole->PolynomB           = PolynomB;
   mpole->MaxOrder           = MaxOrder;
   mpole->NumIntSteps        = NumIntSteps;
+  
   mpole->FringeQuadEntrance = FringeQuadEntrance;
   mpole->FringeQuadExit     = FringeQuadExit;
   mpole->fringeIntM0        = fringeIntM0;
@@ -83,13 +88,6 @@ void MpolePass(double ps[], const int num_particles,
 
   const elem_mpole *mpole = Elem->mpole_ptr;
 
-  const double
-    SL = Elem->Length/mpole->NumIntSteps,
-    L1 = SL*DRIFT1,
-    L2 = SL*DRIFT2,
-    K1 = SL*KICK1,
-    K2 = SL*KICK2;
-
   const bool
     useLinFrEleEntrance =
     (mpole->fringeIntM0 != NULL && mpole->fringeIntP0 != NULL
@@ -98,18 +96,22 @@ void MpolePass(double ps[], const int num_particles,
     (mpole->fringeIntM0 != NULL && mpole->fringeIntP0 != NULL
      && mpole->FringeQuadExit == 2);
 
+  const double
+    SL = Elem->Length/mpole->NumIntSteps,
+    L1 = SL*DRIFT1,
+    L2 = SL*DRIFT2,
+    K1 = SL*KICK1,
+    K2 = SL*KICK2;
+
   if (mpole->KickAngle) {
     // Convert corrector component to polynomial coefficients
     mpole->PolynomB[0] -= sin(mpole->KickAngle[0])/Elem->Length; 
     mpole->PolynomA[0] += sin(mpole->KickAngle[1])/Elem->Length;
   }
 
-#pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD)        \
-  default(none)								    \
-  shared(ps, num_particles, R1, T1, R2, T2, RApertures, EApertures, A, B,   \
-	 L1, L2, K1, K2, max_order, NumIntSteps, FringeQuadEntrance,        \
-	 useLinFrEleEntrance, FringeQuadExit, useLinFrEleExit, fringeIntM0, \
-	 fringeIntP0)							    \
+#pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD)    \
+  default(none)								\
+  shared(ps, num_particles, Elem)					\
   private(k)
 
   for (k = 0; k < num_particles; k++) { /*Loop over particles  */
@@ -121,9 +123,11 @@ void MpolePass(double ps[], const int num_particles,
       /*  misalignment at entrance  */
       if (Elem->T1) ATaddvv(ps_vec, Elem->T1);
       if (Elem->R1) ATmultmv(ps_vec, Elem->R1);
+
       /* Check physical apertures at the entrance of the magnet */
       if (Elem->RApertures) checkiflostRectangularAp(ps_vec, Elem->RApertures);
       if (Elem->EApertures) checkiflostEllipticalAp(ps_vec, Elem->EApertures);
+
       if (mpole->FringeQuadEntrance && mpole->PolynomB[1] != 0) {
 	if (useLinFrEleEntrance) /*Linear fringe fields from elegant */
 	  linearQuadFringeElegantEntrance
@@ -132,6 +136,7 @@ void MpolePass(double ps[], const int num_particles,
 	else
 	  QuadFringePassP(ps_vec, mpole->PolynomB[1]);
       }
+
       /*  integrator  */
       for (m=0; m < mpole->NumIntSteps; m++) {  /*  Loop over slices */
 	fastdrift(ps_vec, NormL1);
@@ -145,6 +150,7 @@ void MpolePass(double ps[], const int num_particles,
 		    mpole->MaxOrder);
 	fastdrift(ps_vec, NormL1);
       }
+
       if (mpole->FringeQuadExit && mpole->PolynomB[1]!=0) {
 	if (useLinFrEleExit) /*Linear fringe fields from elegant*/
 	  linearQuadFringeElegantExit
@@ -153,9 +159,11 @@ void MpolePass(double ps[], const int num_particles,
 	else
 	  QuadFringePassN(ps_vec, mpole->PolynomB[1]);
       }
+
       /* Check physical apertures at the exit of the magnet */
       if (Elem->RApertures) checkiflostRectangularAp(ps_vec, Elem->RApertures);
       if (Elem->EApertures) checkiflostEllipticalAp(ps_vec, Elem->EApertures);
+
       /* Misalignment at exit */
       if (Elem->R2) ATmultmv(ps_vec, Elem->R2);
       if (Elem->T2) ATaddvv(ps_vec, Elem->T2);

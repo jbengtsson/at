@@ -101,7 +101,7 @@ struct elem_type {
     elem_id    *id_ptr;
     elem_drift *drift_ptr;
     elem_mpole *mpole_ptr;
-    elem_bend  *bend_ptr;
+    /* elem_bend  *bend_ptr; */
     elem_cav   *cav_ptr;
   };
 };
