@@ -46,6 +46,7 @@ void mattoarr(const arma::mat &A, double a[])
       a[j*PS_DIM+k] = A(j, k);
 }
 
+//------------------------------------------------------------------------------
 
 struct elem_type* init_elem(const atElem *ElemData, struct elem_type *Elem,
 			    const bool len)
@@ -125,7 +126,7 @@ struct elem_type* init_mpole(const atElem *ElemData, struct elem_type *Elem,
     check_error();
     EntranceAngle = atGetDouble(ElemData, (char*)"EntranceAngle");
     check_error();
-    ExitAngle = atGetDouble(ElemData, (char*)(char*)"ExitAngle");
+    ExitAngle = atGetDouble(ElemData, (char*)"ExitAngle");
     check_error();
     FringeBendEntrance =
       atGetOptionalLong(ElemData, (char*)"FringeBendEntrance", 1);
@@ -198,11 +199,16 @@ struct elem_type* init_cav(const atElem *ElemData, struct elem_type *Elem)
   Elem->cav_ptr = (struct elem_cav*)malloc(sizeof(struct elem_cav));
   cav           = Elem->cav_ptr;
 
-  Length    = atGetDouble(ElemData,"Length"); check_error();
-  Voltage   = atGetDouble(ElemData,"Voltage"); check_error();
-  Energy    = atGetDouble(ElemData,"Energy"); check_error();
-  Frequency = atGetDouble(ElemData,"Frequency"); check_error();
-  TimeLag   = atGetOptionalDouble(ElemData,"TimeLag",0); check_error();
+  Length    = atGetDouble(ElemData, (char*)"Length");
+  check_error();
+  Voltage   = atGetDouble(ElemData, (char*)"Voltage");
+  check_error();
+  Energy    = atGetDouble(ElemData, (char*)"Energy");
+  check_error();
+  Frequency = atGetDouble(ElemData, (char*)"Frequency");
+  check_error();
+  TimeLag   = atGetOptionalDouble(ElemData, (char*)"TimeLag", 0);
+  check_error();
 
   Elem->Length   = Length;
   cav->Voltage   = Voltage;
