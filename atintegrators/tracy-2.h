@@ -48,21 +48,6 @@ struct elem_id { };
 
 struct elem_drift { };
 
-/* struct elem_mpole */
-/* { */
-/*   int */
-/*     MaxOrder, */
-/*     NumIntSteps, */
-/*     FringeQuadEntrance, */
-/*     FringeQuadExit; */
-/*   double */
-/*     *PolynomA, */
-/*     *PolynomB, */
-/*     *fringeIntM0, */
-/*     *fringeIntP0, */
-/*     *KickAngle; */
-/* }; */
-
 struct elem_mpole {
   int
     MaxOrder,
@@ -87,14 +72,14 @@ struct elem_mpole {
     *PolynomB,
     *fringeIntM0,
     *fringeIntP0,
-      *KickAngle;
+    *KickAngle;
 };
 
 struct elem_cav {
   double
     Voltage,            // V0/E0.
     Energy,
-    Frequency,
+    Frequency,          // [Hz].
     TimeLag;
 };
 
@@ -111,7 +96,6 @@ struct elem_type {
     elem_id    *id_ptr;
     elem_drift *drift_ptr;
     elem_mpole *mpole_ptr;
-    /* elem_bend  *bend_ptr; */
     elem_cav   *cav_ptr;
   };
 };

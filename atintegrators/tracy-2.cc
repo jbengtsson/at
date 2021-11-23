@@ -1,5 +1,6 @@
 #include "tracy-2.h"
 
+
 inline std::vector<double> vectostl(const arma::vec &vec)
 { return {vec(x_), vec(px_), vec(y_), vec(py_), vec(delta_), vec(ct_), 1e0}; }
 
@@ -45,6 +46,56 @@ void mattoarr(const arma::mat &A, double a[])
       a[j*PS_DIM+k] = A(j, k);
 }
 
+
+struct elem_type* init_elem(const atElem *ElemData, struct elem_type *Elem,
+			    const bool len)
+{
+  double Length, *R1, *R2, *T1, *T2, *EApertures, *RApertures;
+
+  Elem = (struct elem_type*)malloc(sizeof(struct elem_type));
+
+  if (len) {
+    Length = atGetDouble(ElemData, "Length");
+    check_error();
+  } else
+    Length = 0e0;
+  R1 = atGetOptionalDoubleArray(ElemData, (char*)"R1");
+  check_error();
+  R2 = atGetOptionalDoubleArray(ElemData, (char*)"R2");
+  check_error();
+  T1 = atGetOptionalDoubleArray(ElemData, (char*)"T1");
+  check_error();
+  T2 = atGetOptionalDoubleArray(ElemData, (char*)"T2");
+  check_error();
+  EApertures = atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
+  check_error();
+  RApertures = atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
+  check_error();
+
+  Elem->Length     = Length;
+  Elem->R1         = R1;
+  Elem->R2         = R2;
+  Elem->T1         = T1;
+  Elem->T2         = T2;
+  Elem->EApertures = EApertures;
+  Elem->RApertures = RApertures;
+
+  return Elem;
+}
+
+struct elem_type* init_id(const atElem *ElemData, struct elem_type *Elem)
+{
+  return init_elem(ElemData, Elem, false);
+}
+
+struct elem_type* init_drift(const atElem *ElemData, struct elem_type *Elem)
+{
+  Elem = init_elem(ElemData, Elem, true);
+  Elem->drift_ptr = (struct elem_drift*)malloc(sizeof(struct elem_drift));
+
+  return Elem;
+}
+
 struct elem_type* init_mpole(const atElem *ElemData, struct elem_type *Elem,
 			     const bool bend)
 {
@@ -53,16 +104,13 @@ struct elem_type* init_mpole(const atElem *ElemData, struct elem_type *Elem,
     FringeQuadEntrance, FringeQuadExit;
   double
     Length, BendingAngle, EntranceAngle, ExitAngle, FullGap, FringeInt1,
-    FringeInt2, *PolynomA, *PolynomB, *R1, *R2, *T1, *T2, *EApertures,
-    *RApertures, *fringeIntM0, *fringeIntP0, *KickAngle;
+    FringeInt2, *PolynomA, *PolynomB, *fringeIntM0, *fringeIntP0, *KickAngle;
   elem_mpole *mpole;
 
-  Elem            = (struct elem_type*)malloc(sizeof(struct elem_type));
+  Elem = init_elem(ElemData, Elem, true);
   Elem->mpole_ptr = (struct elem_mpole*)malloc(sizeof(struct elem_mpole));
   mpole           = Elem->mpole_ptr;
 
-  Length = atGetDouble(ElemData, "Length");
-  check_error();
   PolynomA = atGetDoubleArray(ElemData, (char*)"PolynomA");
   check_error();
   PolynomB = atGetDoubleArray(ElemData, (char*)"PolynomB");
@@ -102,30 +150,9 @@ struct elem_type* init_mpole(const atElem *ElemData, struct elem_type *Elem,
   fringeIntP0 = atGetOptionalDoubleArray(ElemData, (char*)"fringeIntP0");
   check_error();
   
-  R1 = atGetOptionalDoubleArray(ElemData, (char*)"R1");
-  check_error();
-  R2 = atGetOptionalDoubleArray(ElemData, (char*)"R2");
-  check_error();
-  T1 = atGetOptionalDoubleArray(ElemData, (char*)"T1");
-  check_error();
-  T2 = atGetOptionalDoubleArray(ElemData, (char*)"T2");
-  check_error();
-
-  EApertures = atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
-  check_error();
-  RApertures = atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
-  check_error();
   KickAngle = atGetOptionalDoubleArray(ElemData, (char*)"KickAngle");
   check_error();
         
-  Elem->Length       = Length;
-  Elem->R1           = R1;
-  Elem->R2           = R2;
-  Elem->T1           = T1;
-  Elem->T2           = T2;
-  Elem->EApertures   = EApertures;
-  Elem->RApertures   = RApertures;
-
   mpole->PolynomA    = PolynomA;
   mpole->PolynomB    = PolynomB;
   mpole->MaxOrder    = MaxOrder;
@@ -162,6 +189,31 @@ struct elem_type* init_mpole(const atElem *ElemData, struct elem_type *Elem,
   return Elem;
 }
 
+struct elem_type* init_cav(const atElem *ElemData, struct elem_type *Elem)
+{
+  double   Length, Voltage, Energy, Frequency, TimeLag;
+  elem_cav *cav;
+
+  Elem          = (struct elem_type*)malloc(sizeof(struct elem_type));
+  Elem->cav_ptr = (struct elem_cav*)malloc(sizeof(struct elem_cav));
+  cav           = Elem->cav_ptr;
+
+  Length    = atGetDouble(ElemData,"Length"); check_error();
+  Voltage   = atGetDouble(ElemData,"Voltage"); check_error();
+  Energy    = atGetDouble(ElemData,"Energy"); check_error();
+  Frequency = atGetDouble(ElemData,"Frequency"); check_error();
+  TimeLag   = atGetOptionalDouble(ElemData,"TimeLag",0); check_error();
+
+  Elem->Length   = Length;
+  cav->Voltage   = Voltage;
+  cav->Energy    = Energy;
+  cav->Frequency = Frequency;
+  cav->TimeLag   = TimeLag;
+
+  return Elem;
+}
+
+//------------------------------------------------------------------------------
 
 inline double get_p_s(const std::vector<double> &ps)
 {
@@ -311,6 +363,8 @@ void Cav_Pass(const double L, const double f_RF, const double VoE0,
   Drift(L/2e0, ps);
 }
 
+//------------------------------------------------------------------------------
+
 #if 1
 
 inline void atdrift(double ps[], const double L)
@@ -379,6 +433,8 @@ void cav_pass(double ps[], const double L, const double VoE0,
   Cav_Pass(L, f_RF, VoE0, phi, ps_stl);
   stltoarr(ps_stl, ps);
 }
+
+//------------------------------------------------------------------------------
 
 #else
 
@@ -535,6 +591,8 @@ void cav_pass(double r_in[], const double le, const double nv,
 }
 
 #endif
+
+//------------------------------------------------------------------------------
 
 static void edge_fringe_entrance(double* r, double inv_rho, double edge_angle,
 				 double fint, double gap, int method)
@@ -699,6 +757,61 @@ static void linearQuadFringeElegantExit
   r6[3] = R[3][2]*r6[2] + R[3][3]*r6[3];
 }
 
+//------------------------------------------------------------------------------
+
+void IdentityPass(double ps[], const int num_particles,
+		  const struct elem_type *Elem)
+{
+  int    k;
+  double *ps_vec;
+    
+  for (k = 0; k < num_particles; k++) {	/*Loop over particles  */
+    ps_vec = ps+k*6;
+    if (!atIsNaN(ps_vec[0])) {
+      /*  misalignment at entrance  */
+      if (Elem->T1) ATaddvv(ps_vec, Elem->T1);
+      if (Elem->R1) ATmultmv(ps_vec, Elem->R1);
+      /* Check physical apertures */
+      if (Elem->RApertures) checkiflostRectangularAp(ps_vec, Elem->RApertures);
+      if (Elem->EApertures) checkiflostEllipticalAp(ps_vec, Elem->EApertures);
+      /* Misalignment at exit */
+      if (Elem->R2) ATmultmv(ps_vec, Elem->R2);
+      if (Elem->T2) ATaddvv(ps_vec, Elem->T2);
+    }
+  }
+}
+
+void DriftPass(double *ps, const int num_particles,
+	       const struct elem_type *Elem)
+/* le - physical length
+   ps - 6-by-N matrix of initial conditions reshaped into 
+   1-d array of 6*N elements                                                  */
+{
+  int    k;
+  double *ps_vec;
+  
+#pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD*10)    \
+  default(shared) shared(ps, num_particles) private(k, ps_vec)
+
+  for (k = 0; k < num_particles; k++) { /*Loop over particles  */
+    ps_vec = ps+k*6;
+    if(!atIsNaN(ps_vec[0])) {
+      /*  misalignment at entrance  */
+      if (Elem->T1) ATaddvv(ps_vec, Elem->T1);
+      if (Elem->R1) ATmultmv(ps_vec, Elem->R1);
+      /* Check physical apertures at the entrance of the magnet */
+      if (Elem->RApertures) checkiflostRectangularAp(ps_vec, Elem->RApertures);
+      if (Elem->EApertures) checkiflostEllipticalAp(ps_vec, Elem->EApertures);
+      atdrift(ps_vec, Elem->Length);
+      /* Check physical apertures at the exit of the magnet */
+      if (Elem->RApertures) checkiflostRectangularAp(ps_vec, Elem->RApertures);
+      if (Elem->EApertures) checkiflostEllipticalAp(ps_vec, Elem->EApertures);
+      /* Misalignment at exit */
+      if (Elem->R2) ATmultmv(ps_vec, Elem->R2);
+      if (Elem->T2) ATaddvv(ps_vec, Elem->T2);
+    }
+  }
+}
 
 void MpolePass(double ps[], const int num_particles,
 	       const struct elem_type *Elem)
@@ -809,5 +922,21 @@ void MpolePass(double ps[], const int num_particles,
     /* Remove corrector component in polynomial coefficients */
     mpole->PolynomB[0] += sin(mpole->KickAngle[0])/Elem->Length;
     mpole->PolynomA[0] -= sin(mpole->KickAngle[1])/Elem->Length;
+  }
+}
+
+void CavityPass(double ps[], const int num_particles,
+		const struct elem_type *Elem)
+{
+  int    k;
+  double *ps_vec;
+
+  const elem_cav *cav = Elem->cav_ptr;
+
+  for(k = 0; k < num_particles; k++) {
+    ps_vec = ps+k*6;
+    if(!atIsNaN(ps_vec[0]))
+      cav_pass(ps_vec,  Elem->Length, cav->Voltage, cav->Frequency,
+	       cav->TimeLag);
   }
 }
