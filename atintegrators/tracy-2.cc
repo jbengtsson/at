@@ -10,10 +10,11 @@ inline arma::vec stltovec(const std::vector<double> &a)
 arma::vec arrtovec(const double a[])
 { return {a[x_], a[px_], a[y_], a[py_], a[delta_], a[ct_], 1e0}; }
 
-void vectoarr(const arma::vec &vec, double a[])
+double* vectoarr(const arma::vec &vec)
 {
-  for (int k = 0; k < PS_DIM; k++)
-    a[k] = vec(k);
+  static double a[] =
+    {vec(x_), vec(px_), vec(y_), vec(py_), vec(delta_), vec(ct_), 1e0};
+  return a;
 }
 
 inline std::vector<double> arrtostl(const double a[])
@@ -219,6 +220,8 @@ struct elem_type* init_cav(const atElem *ElemData, struct elem_type *Elem)
   return Elem;
 }
 
+#if 1
+
 //------------------------------------------------------------------------------
 
 inline double get_p_s(const std::vector<double> &ps)
@@ -371,8 +374,6 @@ void Cav_Pass(const double L, const double f_RF, const double VoE0,
 
 //------------------------------------------------------------------------------
 
-#if 1
-
 inline void atdrift(double ps[], const double L)
 {
   std::vector<double> ps_stl(PS_DIM, 0e0);
@@ -391,20 +392,6 @@ inline void fastdrift(double ps[], const double L)
   stltoarr(ps_stl, ps);
 }
 
-void strthinkick(double ps[], const double a[], const double b[],
-		 const double L, const int n_max)
-{
-  double              bn[2*HOMmax+1];
-  std::vector<double> ps_stl = arrtostl(ps);
-
-  for (int k = n_max+1; k > 0; k--) {
-    bn[HOMmax+k] = b[k-1];
-    bn[HOMmax-k] = a[k-1];
-  }
-  thin_kick(n_max+1, bn, L, 0e0, 0e0, ps_stl);
-  stltoarr(ps_stl, ps);
-}
-
 void edge_fringe(double ps[], const double inv_rho,
 		 const double edge_angle, const double fint,
 		 const double gap, const int method, const bool hor)
@@ -415,7 +402,7 @@ void edge_fringe(double ps[], const double inv_rho,
   stltoarr(ps_stl, ps);
 }
 
-void bndthinkick(double ps[], const double a[], const double b[],
+void thin_kick(double ps[], const double a[], const double b[],
 		 const double L, const double irho, const int n_max)
 {
   double              bn[2*HOMmax+1];
@@ -440,161 +427,9 @@ void cav_pass(double ps[], const double L, const double VoE0,
   stltoarr(ps_stl, ps);
 }
 
-//------------------------------------------------------------------------------
-
 #else
 
-static void atdrift(double* r, double L)
-/* Input parameter L is the physical length
-   1/(1+delta) normalization is done internally                               */
-{
-  double p_norm = 1/(1+r[4]); 
-  double NormL  = L*p_norm;   
-  r[0]+= NormL*r[1]; 
-  r[2]+= NormL*r[3];
-  r[5]+= NormL*p_norm*(r[1]*r[1]+r[3]*r[3])/2;
-}
-
-static void fastdrift(double* r, double NormL)
-
-/* NormL=(Physical Length)/(1+delta)  is computed externally to speed up
-   calculations  in the loop if momentum deviation (delta) does not change
-   such as in 4-th order symplectic integrator w/o radiation                  */
-
-{
-  r[0] += NormL*r[1];
-  r[2] += NormL*r[3];
-  r[5] += NormL*(r[1]*r[1]+r[3]*r[3])/(2*(1+r[4]));
-}
-
-static void strthinkick(double* r, const double* A, const double* B, double L,
-			int max_order)
-/***************************************************************************** 
- Calculate and apply a multipole kick to a 6-dimentional
- phase space vector in a straight element (quadrupole)
- 
- IMPORTANT !!!
- The reference coordinate system is straight but the field expansion may still
- contain dipole terms: PolynomA(1), PolynomB(1) - in MATLAB notation,
- A[0], B[0] - C,C++ notation
- 
-******************************************************************************/
-{
-  int i;
-  double ReSum = B[max_order];
-  double ImSum = A[max_order];
-  double ReSumTemp;
-  for (i = max_order-1; i >= 0; i--) {
-    ReSumTemp = ReSum*r[0] - ImSum*r[2] + B[i];
-    ImSum = ImSum*r[0] +  ReSum*r[2] + A[i];
-    ReSum = ReSumTemp;
-  }
-  r[1] -= L*ReSum;
-  r[3] += L*ImSum;
-}
-
-static void edge_fringe(double r[], const double inv_rho,
-			const double edge_angle, const double fint,
-			const double gap, const int method, const bool hor)
-{
-  /*     method 0 no fringe field
-   *     method 1 legacy version Brown First Order
-   *     method 2 SOLEIL close to second order of Brown
-   *     method 3 THOMX
-   */
-  double fringecorr, fx, fy;
-  /* Fringe field correction */
-  if ((fint==0.0) || (gap==0.0) || (method==0))
-    fringecorr = 0.0;
-  else {
-    double sedge = sin(edge_angle);
-    double cedge = cos(edge_angle);
-    fringecorr = inv_rho*gap*fint*(1+sedge*sedge)/cedge;
-  }
-    
-  /* Edge angle focusing */
-  fx = inv_rho*tan(edge_angle);
-  if (method==1)
-    fy = inv_rho*tan(edge_angle-fringecorr/(1+r[4]));
-  else if (method==2)
-    fy = inv_rho*tan(edge_angle-fringecorr/(1+r[4]))/(1+r[4]);
-  else if (method==3)
-    if (hor)
-      fy = inv_rho*tan(edge_angle-fringecorr+r[1]/(1+r[4]));
-    else
-      fy = inv_rho*tan(edge_angle-fringecorr-r[1]/(1+r[4]));
-  else    /* fall back to legacy version */
-    fy = inv_rho*tan(edge_angle-fringecorr/(1+r[4]));
-
-  r[1] += r[0]*fx;
-  r[3] -= r[2]*fy;
-}
-
-static void bndthinkick(double* r, double* A, double* B, double L, double irho,
-			int max_order)
-/***************************************************************************** 
-Calculate multipole kick in a curved elemrnt (bending magnet)
-The reference coordinate system  has the curvature given by the inverse 
-(design) radius irho.
-IMPORTANT !!!
-The magnetic field Bo that provides this curvature MUST NOT be included in the dipole term
-PolynomB[1](MATLAB notation)(C: B[0] in this function) of the By field expansion
-
-The kick is given by
-
-           e L      L delta      L x
-theta  = - --- B  + -------  -  -----  , 
-     x     p    y     rho           2
-            0                    rho
-
-         e L
-theta  = --- B
-     y    p   x
-           0
-
-*************************************************************************/
-{
-  int    i;
-  double ReSum = B[max_order];
-  double ImSum = A[max_order];
-  double ReSumTemp;
-  /* recursively calculate the local transverse magnetic field
-   * Bx = ReSum, By = ImSum
-   */
-  for (i = max_order-1; i >= 0; i--) {
-    ReSumTemp = ReSum*r[0] - ImSum*r[2] + B[i];
-    ImSum = ImSum*r[0] +  ReSum*r[2] + A[i];
-    ReSum = ReSumTemp;
-  }
-  r[1] -= L*(ReSum-(r[4]-r[0]*irho)*irho);
-  r[3] += L*ImSum;
-  r[5] += L*irho*r[0]; /* pathlength */
-}
-
-void cav_pass(double r_in[], const double le, const double nv,
-	      const double freq, const double lag)
-{
-  double p_norm, NormL;
-
-  if (le == 0)
-    r_in[4] += -nv*sin(TWOPI*freq*(r_in[5]-lag)/C0);
-  else {
-    p_norm = 1/(1+r_in[4]);
-    NormL  = le/2*p_norm;
-    /* Prropagate through a drift equal to half cavity length */
-    r_in[0] += NormL*r_in[1];
-    r_in[2] += NormL*r_in[3];
-    r_in[5] += NormL*p_norm*(r_in[1]*r_in[1]+r_in[3]*r_in[3])/2;
-    /* Longitudinal momentum kick */
-    r_in[4] += -nv*sin(TWOPI*freq*(r_in[5]-lag)/C0);
-    p_norm = 1/(1+r_in[4]);
-    NormL  = le/2*p_norm;
-    /* Prropagate through a drift equal to half cavity length */
-    r_in[0] += NormL*r_in[1];
-    r_in[2] += NormL*r_in[3];
-    r_in[5] += NormL*p_norm*(r_in[1]*r_in[1]+r_in[3]*r_in[3])/2;
-  }
-}
+#include "at_pass_obsolete.cc"
 
 #endif
 
@@ -887,13 +722,13 @@ void MpolePass(double ps[], const int num_particles,
       /* integrator */
       for(m = 0; m < mpole->NumIntSteps; m++) { /* Loop over slices*/
 	fastdrift(ps_vec, NormL1);
-	bndthinkick(ps_vec, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho,
+	thin_kick(ps_vec, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho,
 		    mpole->MaxOrder);
 	fastdrift(ps_vec, NormL2);
-	bndthinkick(ps_vec, mpole->PolynomA, mpole->PolynomB, K2, mpole->irho,
+	thin_kick(ps_vec, mpole->PolynomA, mpole->PolynomB, K2, mpole->irho,
 		    mpole->MaxOrder);
 	fastdrift(ps_vec, NormL2);
-	bndthinkick(ps_vec, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho,
+	thin_kick(ps_vec, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho,
 		    mpole->MaxOrder);
 	fastdrift(ps_vec, NormL1);
       }
