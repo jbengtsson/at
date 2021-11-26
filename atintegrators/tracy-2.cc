@@ -10,11 +10,10 @@ inline arma::vec stltovec(const std::vector<double> &a)
 arma::vec arrtovec(const double a[])
 { return {a[x_], a[px_], a[y_], a[py_], a[delta_], a[ct_], 1e0}; }
 
-double* vectoarr(const arma::vec &vec)
+void vectoarr(const arma::vec &vec, double a[])
 {
-  static double a[] =
-    {vec(x_), vec(px_), vec(y_), vec(py_), vec(delta_), vec(ct_), 1e0};
-  return a;
+  for (int k = 0; k < PS_DIM; k++)
+    a[k] = vec(k);
 }
 
 inline std::vector<double> arrtostl(const double a[])
@@ -220,7 +219,7 @@ struct elem_type* init_cav(const atElem *ElemData, struct elem_type *Elem)
   return Elem;
 }
 
-#if 1
+#if 0
 
 //------------------------------------------------------------------------------
 
@@ -379,7 +378,6 @@ inline void atdrift(double ps[], const double L)
   std::vector<double> ps_stl(PS_DIM, 0e0);
 
   ps_stl = arrtostl(ps);
-
   Drift(L, ps_stl);
   stltoarr(ps_stl, ps);
 }
