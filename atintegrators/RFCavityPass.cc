@@ -3,10 +3,13 @@
 
 
 struct elem_type*
-trackFunction(const atElem *ElemData, struct elem_type *Elem, double *ps,
+trackFunction(const PyObject *ElemData, struct elem_type *Elem, double *ps,
 	      const int num_particles, const struct parameters *Param)
 {
   if (!Elem) Elem = init_cav(ElemData, Elem);
-  CavityPass(ps, num_particles, Elem);
-  return Elem;
+  if (Elem) {
+    CavityPass(ps, num_particles, Elem);
+    return Elem;
+  } else
+    return NULL;
 }

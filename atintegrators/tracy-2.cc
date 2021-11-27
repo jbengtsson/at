@@ -1,3 +1,7 @@
+#include <math.h>
+
+#include <armadillo>
+
 #include "tracy-2.h"
 
 
@@ -48,7 +52,7 @@ void mattoarr(const arma::mat &A, double a[])
 
 //------------------------------------------------------------------------------
 
-struct elem_type* init_elem(const atElem *ElemData, struct elem_type *Elem,
+struct elem_type* init_elem(const PyObject *ElemData, struct elem_type *Elem,
 			    const bool len)
 {
   double Length, *R1, *R2, *T1, *T2, *EApertures, *RApertures;
@@ -84,142 +88,157 @@ struct elem_type* init_elem(const atElem *ElemData, struct elem_type *Elem,
   return Elem;
 }
 
-struct elem_type* init_id(const atElem *ElemData, struct elem_type *Elem)
+struct elem_type* init_id(const PyObject *ElemData, struct elem_type *Elem)
 {
-  return init_elem(ElemData, Elem, false);
+  Elem = init_elem(ElemData, Elem, false);
+  if (Elem) {
+    Elem->id_ptr = (struct elem_id*)malloc(sizeof(struct elem_id));
+    return Elem;
+  } else
+    return NULL;
 }
 
-struct elem_type* init_drift(const atElem *ElemData, struct elem_type *Elem)
+struct elem_type* init_drift(const PyObject *ElemData, struct elem_type *Elem)
 {
   Elem = init_elem(ElemData, Elem, true);
-  Elem->drift_ptr = (struct elem_drift*)malloc(sizeof(struct elem_drift));
-
-  return Elem;
+  if (Elem) {
+    Elem->drift_ptr = (struct elem_drift*)malloc(sizeof(struct elem_drift));
+    return Elem;
+  } else
+    return NULL;
 }
 
-struct elem_type* init_mpole(const atElem *ElemData, struct elem_type *Elem,
+struct elem_type* init_mpole(const PyObject *ElemData, struct elem_type *Elem,
 			     const bool bend)
 {
   int
     MaxOrder, NumIntSteps,  FringeBendEntrance, FringeBendExit,
     FringeQuadEntrance, FringeQuadExit;
   double
-    Length, BendingAngle, EntranceAngle, ExitAngle, FullGap, FringeInt1,
-    FringeInt2, *PolynomA, *PolynomB, *fringeIntM0, *fringeIntP0, *KickAngle;
-  elem_mpole *mpole;
+    BendingAngle, EntranceAngle, ExitAngle, FullGap, FringeInt1, FringeInt2,
+    *PolynomA, *PolynomB, *fringeIntM0, *fringeIntP0, *KickAngle;
+  elem_mpole
+    *mpole;
 
   Elem = init_elem(ElemData, Elem, true);
-  Elem->mpole_ptr = (struct elem_mpole*)malloc(sizeof(struct elem_mpole));
-  mpole           = Elem->mpole_ptr;
+  if (Elem) {
+    Elem->mpole_ptr = (struct elem_mpole*)malloc(sizeof(struct elem_mpole));
+    mpole           = Elem->mpole_ptr;
 
-  PolynomA = atGetDoubleArray(ElemData, (char*)"PolynomA");
-  check_error();
-  PolynomB = atGetDoubleArray(ElemData, (char*)"PolynomB");
-  check_error();
-  MaxOrder = atGetLong(ElemData, (char*)"MaxOrder");
-  check_error();
-  NumIntSteps = atGetLong(ElemData, (char*)"NumIntSteps");
-  check_error();
+    PolynomA = atGetDoubleArray(ElemData, (char*)"PolynomA");
+    check_error();
+    PolynomB = atGetDoubleArray(ElemData, (char*)"PolynomB");
+    check_error();
+    MaxOrder = atGetLong(ElemData, (char*)"MaxOrder");
+    check_error();
+    NumIntSteps = atGetLong(ElemData, (char*)"NumIntSteps");
+    check_error();
 
-  if (bend) {
-    BendingAngle = atGetDouble(ElemData, (char*)"BendingAngle");
-    check_error();
-    EntranceAngle = atGetDouble(ElemData, (char*)"EntranceAngle");
-    check_error();
-    ExitAngle = atGetDouble(ElemData, (char*)"ExitAngle");
-    check_error();
-    FringeBendEntrance =
-      atGetOptionalLong(ElemData, (char*)"FringeBendEntrance", 1);
-    check_error();
-    FringeBendExit = atGetOptionalLong(ElemData, (char*)"FringeBendExit", 1);
-    check_error();
-    FullGap = atGetOptionalDouble(ElemData, (char*)"FullGap", 0);
-    check_error();
-    FringeInt1 = atGetOptionalDouble(ElemData, (char*)"FringeInt1", 0);
-    check_error();
-    FringeInt2 = atGetOptionalDouble(ElemData, (char*)"FringeInt2", 0);
-    check_error();
-  }
+    if (bend) {
+      BendingAngle = atGetDouble(ElemData, (char*)"BendingAngle");
+      check_error();
+      EntranceAngle = atGetDouble(ElemData, (char*)"EntranceAngle");
+      check_error();
+      ExitAngle = atGetDouble(ElemData, (char*)"ExitAngle");
+      check_error();
+      FringeBendEntrance =
+	atGetOptionalLong(ElemData, (char*)"FringeBendEntrance", 1);
+      check_error();
+      FringeBendExit = atGetOptionalLong(ElemData, (char*)"FringeBendExit", 1);
+      check_error();
+      FullGap = atGetOptionalDouble(ElemData, (char*)"FullGap", 0);
+      check_error();
+      FringeInt1 = atGetOptionalDouble(ElemData, (char*)"FringeInt1", 0);
+      check_error();
+      FringeInt2 = atGetOptionalDouble(ElemData, (char*)"FringeInt2", 0);
+      check_error();
+    }
 
-  FringeQuadEntrance =
-    atGetOptionalLong(ElemData, (char*)"FringeQuadEntrance", 0);
-  check_error();
-  FringeQuadExit = atGetOptionalLong(ElemData, (char*)"FringeQuadExit", 0);
-  check_error();
-  fringeIntM0 = atGetOptionalDoubleArray(ElemData, (char*)"fringeIntM0");
-  check_error();
-  fringeIntP0 = atGetOptionalDoubleArray(ElemData, (char*)"fringeIntP0");
-  check_error();
+    FringeQuadEntrance =
+      atGetOptionalLong(ElemData, (char*)"FringeQuadEntrance", 0);
+    check_error();
+    FringeQuadExit = atGetOptionalLong(ElemData, (char*)"FringeQuadExit", 0);
+    check_error();
+    fringeIntM0 = atGetOptionalDoubleArray(ElemData, (char*)"fringeIntM0");
+    check_error();
+    fringeIntP0 = atGetOptionalDoubleArray(ElemData, (char*)"fringeIntP0");
+    check_error();
   
-  KickAngle = atGetOptionalDoubleArray(ElemData, (char*)"KickAngle");
-  check_error();
+    KickAngle = atGetOptionalDoubleArray(ElemData, (char*)"KickAngle");
+    check_error();
         
-  mpole->PolynomA    = PolynomA;
-  mpole->PolynomB    = PolynomB;
-  mpole->MaxOrder    = MaxOrder;
-  mpole->NumIntSteps = NumIntSteps;
+    mpole->PolynomA    = PolynomA;
+    mpole->PolynomB    = PolynomB;
+    mpole->MaxOrder    = MaxOrder;
+    mpole->NumIntSteps = NumIntSteps;
 
-  if (bend) {
-    mpole->BendingAngle       = BendingAngle;
-    mpole->EntranceAngle      = EntranceAngle;
-    mpole->ExitAngle          = ExitAngle;
-    mpole->FringeBendEntrance = FringeBendEntrance;
-    mpole->FringeBendExit     = FringeBendExit;
-    mpole->FringeInt1         = FringeInt1;
-    mpole->FringeInt2         = FringeInt2;
-    mpole->FullGap            = FullGap;
-   } else {
-    mpole->BendingAngle       = 0e0;
-    mpole->EntranceAngle      = 0e0;
-    mpole->ExitAngle          = 0e0;
-    mpole->FringeBendEntrance = 0;
-    mpole->FringeBendExit     = 0;
-    mpole->FringeInt1         = 0e0;
-    mpole->FringeInt2         = 0e0;
-    mpole->FullGap            = 0e0;
-  }
+    if (bend) {
+      mpole->BendingAngle       = BendingAngle;
+      mpole->EntranceAngle      = EntranceAngle;
+      mpole->ExitAngle          = ExitAngle;
+      mpole->FringeBendEntrance = FringeBendEntrance;
+      mpole->FringeBendExit     = FringeBendExit;
+      mpole->FringeInt1         = FringeInt1;
+      mpole->FringeInt2         = FringeInt2;
+      mpole->FullGap            = FullGap;
+    } else {
+      mpole->BendingAngle       = 0e0;
+      mpole->EntranceAngle      = 0e0;
+      mpole->ExitAngle          = 0e0;
+      mpole->FringeBendEntrance = 0;
+      mpole->FringeBendExit     = 0;
+      mpole->FringeInt1         = 0e0;
+      mpole->FringeInt2         = 0e0;
+      mpole->FullGap            = 0e0;
+    }
 
-  mpole->irho = (Elem->Length != 0e0)? mpole->BendingAngle/Elem->Length : 0e0;
+    mpole->irho = (Elem->Length != 0e0)? mpole->BendingAngle/Elem->Length : 0e0;
 
-  mpole->FringeQuadEntrance = FringeQuadEntrance;
-  mpole->FringeQuadExit     = FringeQuadExit;
-  mpole->fringeIntM0        = fringeIntM0;
-  mpole->fringeIntP0        = fringeIntP0;
-  mpole->KickAngle          = KickAngle;
+    mpole->FringeQuadEntrance = FringeQuadEntrance;
+    mpole->FringeQuadExit     = FringeQuadExit;
+    mpole->fringeIntM0        = fringeIntM0;
+    mpole->fringeIntP0        = fringeIntP0;
+    mpole->KickAngle          = KickAngle;
 
-  return Elem;
+    return Elem;
+  } else
+    return NULL;
 }
 
-struct elem_type* init_cav(const atElem *ElemData, struct elem_type *Elem)
+struct elem_type* init_cav(const PyObject *ElemData, struct elem_type *Elem)
 {
   double   Length, Voltage, Energy, Frequency, TimeLag;
   elem_cav *cav;
 
-  Elem          = (struct elem_type*)malloc(sizeof(struct elem_type));
-  Elem->cav_ptr = (struct elem_cav*)malloc(sizeof(struct elem_cav));
-  cav           = Elem->cav_ptr;
+  Elem = init_elem(ElemData, Elem, true);
+  if (Elem) {
+    Elem          = (struct elem_type*)malloc(sizeof(struct elem_type));
+    Elem->cav_ptr = (struct elem_cav*)malloc(sizeof(struct elem_cav));
+    cav           = Elem->cav_ptr;
 
-  Length    = atGetDouble(ElemData, (char*)"Length");
-  check_error();
-  Voltage   = atGetDouble(ElemData, (char*)"Voltage");
-  check_error();
-  Energy    = atGetDouble(ElemData, (char*)"Energy");
-  check_error();
-  Frequency = atGetDouble(ElemData, (char*)"Frequency");
-  check_error();
-  TimeLag   = atGetOptionalDouble(ElemData, (char*)"TimeLag", 0);
-  check_error();
+    Length    = atGetDouble(ElemData, (char*)"Length");
+    check_error();
+    Voltage   = atGetDouble(ElemData, (char*)"Voltage");
+    check_error();
+    Energy    = atGetDouble(ElemData, (char*)"Energy");
+    check_error();
+    Frequency = atGetDouble(ElemData, (char*)"Frequency");
+    check_error();
+    TimeLag   = atGetOptionalDouble(ElemData, (char*)"TimeLag", 0);
+    check_error();
 
-  Elem->Length   = Length;
-  cav->Voltage   = Voltage;
-  cav->Energy    = Energy;
-  cav->Frequency = Frequency;
-  cav->TimeLag   = TimeLag;
+    Elem->Length   = Length;
+    cav->Voltage   = Voltage;
+    cav->Energy    = Energy;
+    cav->Frequency = Frequency;
+    cav->TimeLag   = TimeLag;
 
-  return Elem;
+    return Elem;
+  } else
+    return NULL;
 }
 
-#if 0
+#if 1
 
 //------------------------------------------------------------------------------
 

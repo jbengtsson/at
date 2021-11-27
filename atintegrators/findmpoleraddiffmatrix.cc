@@ -441,7 +441,7 @@ static void FindElemB(double *orbit_in, double le, double irho, double *A,
 }
 
 
-static double *diffmatrix(const atElem *ElemData, double *orb, double energy,
+static double *diffmatrix(const PyObject *ElemData, double *orb, double energy,
 			  double *bdiff)
 {
   double

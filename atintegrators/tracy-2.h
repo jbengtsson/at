@@ -1,6 +1,3 @@
-#include <math.h>
-
-#include <armadillo>
 
 #define PS_DIM 6
 

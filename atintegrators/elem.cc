@@ -1,7 +1,4 @@
-/*
- * The file to be included by 'new-style' integrators that support both
- * Matlab and Python.
- */
+
 #ifndef ATELEM_C
 #define ATELEM_C
 
@@ -16,7 +13,6 @@
 /*            For the Python interface                */
 /*----------------------------------------------------*/
 
-typedef PyObject atElem;
 #define check_error() if (PyErr_Occurred()) return NULL
 
 static int array_imported = 0;
@@ -44,8 +40,8 @@ static double atGetDouble(const PyObject *element, const char *name)
   return PyFloat_AsDouble((PyObject *)attr);
 }
 
-static long
-atGetOptionalLong(const PyObject *element, const char *name, long default_value)
+static long atGetOptionalLong(const PyObject *element, const char *name,
+			      long default_value)
 {
   long l = atGetLong(element, name);
   if (PyErr_Occurred()) {
@@ -55,9 +51,8 @@ atGetOptionalLong(const PyObject *element, const char *name, long default_value)
   return l;
 }
 
-static double
-atGetOptionalDouble(const PyObject *element, const char *name,
-		    double default_value)
+static double atGetOptionalDouble(const PyObject *element, const char *name,
+				  double default_value)
 {
   double d = atGetDouble(element, name);
   if (PyErr_Occurred()) {
@@ -67,9 +62,8 @@ atGetOptionalDouble(const PyObject *element, const char *name,
   return d;
 }
 
-static double*
-atGetArrayData(PyArrayObject *array, char *name, int atype, int *msz,
-	       int *nsz)
+static double* atGetArrayData(PyArrayObject *array, char *name, int atype,
+			      int *msz, int *nsz)
 {
   char errmessage[60];
   int ndims;
@@ -103,8 +97,8 @@ atGetArrayData(PyArrayObject *array, char *name, int atype, int *msz,
   return (double *) PyArray_DATA(array);
 }
 
-static double*
-atGetDoubleArraySz(const PyObject *element, char *name, int *msz, int *nsz)
+static double* atGetDoubleArraySz(const PyObject *element, char *name, int *msz,
+				  int *nsz)
 {
   PyArrayObject *array =
     (PyArrayObject *) PyObject_GetAttrString((PyObject *)element, name);
@@ -120,9 +114,8 @@ static double* atGetDoubleArray(const PyObject *element, char *name)
   return atGetDoubleArraySz(element, name, &msz, &nsz);
 }
 
-static double*
-atGetOptionalDoubleArraySz(const PyObject *element, char *name, int *msz,
-			   int *nsz)
+static double* atGetOptionalDoubleArraySz(const PyObject *element, char *name,
+					  int *msz, int *nsz)
 {
   PyArrayObject *array =
     (PyArrayObject *) PyObject_GetAttrString((PyObject *)element, name);
@@ -140,14 +133,8 @@ static double* atGetOptionalDoubleArray(const PyObject *element, char *name)
 }
 
 
-#ifdef __cplusplus
-#define C_LINK extern "C"
-#else
-#define C_LINK
-#endif
-
-C_LINK ExportMode struct elem_type*
-trackFunction(const atElem *ElemData, struct elem_type *Elem, double ps[],
+extern "C" struct elem_type*
+trackFunction(const PyObject *ElemData, struct elem_type *Elem, double ps[],
 	      const int num_particles, const struct parameters *Param);
 
 #endif /*ATELEM_C*/

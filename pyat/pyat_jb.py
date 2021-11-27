@@ -94,7 +94,6 @@ def example(ring):
         for fld in beamdata.dtype.fields.keys():
             print(fld)
 
-
 lat_dir = os.environ['LAT']
 
 lat_name = {

@@ -1,9 +1,7 @@
-/*
-   This file contains the Python interface to AT, compatible with Python 3 only.
-   It provides a module 'atpass' containing one method 'atpass'.
-                                                                              */
+/* Python interface for Tracy-2; compatible with Python 3 only.
+   It provides a module 'atpass' containing one method 'atpass'.              */
 
-#define PY_SSIZE_T_CLEAN
+#define  PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <stdarg.h>
 #ifdef _OPENMP
@@ -14,7 +12,7 @@
 #include <math.h>
 #include <float.h>
 
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#define  NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/ndarrayobject.h>
 
 #define NUMPY_IMPORT_ARRAY_RETVAL NULL
@@ -23,8 +21,6 @@
 
 #include "attypes.h"
 
-
-typedef PyObject atElem;
 
 #define ATPY_PASS "trackFunction"
 
@@ -54,14 +50,14 @@ typedef union elem*
 		  double *r_in, int num_particles, struct parameters *param);
 
 static npy_uint32     num_elements        = 0;
-static union elem **elemdata_list     = NULL;
+static union elem     **elemdata_list     = NULL;
 static PyObject       **element_list      = NULL;
 static track_function *integrator_list    = NULL;
 static PyObject       **pyintegrator_list = NULL;
 static PyObject       **kwargs_list       = NULL;
 static char           integrator_path[300];
 
-/* Directly copied from atpass.c */
+/* For AT defined in atpass.c. */
 static struct LibraryListElement {
   const char                *MethodName;
   LIBRARYHANDLETYPE         LibraryHandle;
@@ -80,8 +76,9 @@ static PyObject *print_error(int elem_number, PyObject *rout)
 
 static PyObject *set_error(PyObject *errtype, const char *fmt, ...)
 {
-  char buffer[132];
+  char    buffer[132];
   va_list ap;
+
   va_start(ap, fmt);
   vsprintf(buffer, fmt, ap);
   PyErr_SetString(errtype, buffer);
@@ -89,17 +86,15 @@ static PyObject *set_error(PyObject *errtype, const char *fmt, ...)
   return NULL;
 }
 
-/*
- * Recursively search the list to check if the library containing
- * method_name is already loaded. If it is - return the pointer to the
- * list element. If not, return NULL.
- */
+/* Recursively search the list to check if the library containing
+   method_name is already loaded. If it is - return the pointer to the
+   list element. If not, return NULL.                                         */
 static struct LibraryListElement*
 SearchLibraryList(struct LibraryListElement *head, const char *method_name)
 {
   if (head)
-    return (strcmp(head->MethodName, method_name)==0) ? head :
-      SearchLibraryList(head->Next, method_name);
+    return (strcmp(head->MethodName, method_name) == 0)?
+      head : SearchLibraryList(head->Next, method_name);
   else
     return NULL;
 }
@@ -155,10 +150,7 @@ static void setlost(double *drin, npy_uint32 np)
 }
 
 
-/*
- * Use Python calls to establish the location of the at integrators
- * package.
- */
+/* Use Python calls to establish the location of the at integrators package.  */
 static PyObject* get_integrators(void) {
   PyObject *at_module, *os_module, *fileobj, *dirname_function, *dirobj;
 
@@ -178,11 +170,9 @@ static PyObject* get_integrators(void) {
   return dirobj;
 }
 
-/*
- * Query Python for the full extension given to shared objects.
- * This is useful for Python 3, where the extension may not be trivial.
- * If none is defined, return NULL.
- */
+/* Query Python for the full extension given to shared objects.
+   This is useful for Python 3, where the extension may not be trivial.
+   If none is defined, return NULL.                                           */
 static PyObject* get_ext_suffix(void) {
   PyObject *sysconfig_module, *get_config_var_fn, *ext_suffix;
 
@@ -197,10 +187,8 @@ static PyObject* get_ext_suffix(void) {
   return ext_suffix;
 }
 
-/*
- * Import the python module for python integrators
- * and return the function object
- */
+/* Import the python module for python integrators and return the function
+   object                                                                     */
 static PyObject* GetpyFunction(const char *fn_name)
 {
   char      dest[300];
@@ -229,10 +217,8 @@ static PyObject* GetpyFunction(const char *fn_name)
   return pyfunction;
 }
 
-/*
- * Build input positional arguments for python integrators
- */
-static PyObject* Buildkwargs(const atElem *ElemData)
+/* Build input positional arguments for python integrators */
+static PyObject* Buildkwargs(const PyObject *ElemData)
 {
   PyObject *kwargs;
 
@@ -241,9 +227,7 @@ static PyObject* Buildkwargs(const atElem *ElemData)
   return kwargs;
 }
 
-/*
- * Build input keyword arguments for python integrators
- */
+/* Build input keyword arguments for python integrators */
 static PyObject* Buildargs(double *r_in, int num_particles)
 {
   npy_intp outdims[1];
@@ -257,9 +241,7 @@ static PyObject* Buildargs(double *r_in, int num_particles)
   return PyTuple_Pack(1,rin);
 }
 
-/*
- * Call python integrators
- */
+/* Call python integrators */
 static PyObject
 *pyIntegratorPass(double *r_in, PyObject *function, PyObject *kwargs,
 		  int num_particles)
@@ -272,9 +254,7 @@ static PyObject
   return kwargs;
 }
 
-/*
- * Find the correct track function by name.
- */
+/* Find the correct track function by name. */
 static struct LibraryListElement* get_track_function(const char *fn_name) {
 
   struct LibraryListElement
@@ -329,15 +309,13 @@ static struct LibraryListElement* get_track_function(const char *fn_name) {
   return LibraryListPtr;
 }
 
-/*
-  Parse the arguments to atpass, set things up, and execute.
-  Arguments:
-    line:   sequence of elements
-    rin:    numpy 6-vector of initial conditions
-    nturns: int number of turns to simulate
-    refpts: numpy uint32 array denoting elements at which to return state
-    reuse:  whether to reuse the cached state of the ring
- */
+/* Parse the arguments to atpass, set things up, and execute.
+   Arguments:
+     line:   sequence of elements
+     rin:    numpy 6-vector of initial conditions
+     nturns: int number of turns to simulate
+     refpts: numpy uint32 array denoting elements at which to return state
+     reuse:  whether to reuse the cached state of the ring                    */
 static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
   // C -> C++.
   static char
@@ -345,8 +323,10 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     {(char*)"line", (char*)"rin", (char*)"nturns", (char*)"refpts",
      (char*)"reuse", (char*)"omp_num_threads", (char*)"losses",
      (char*)NULL};
-  static double lattice_length = 0.0;
-  static int    valid = 0;
+  static double
+    lattice_length = 0.0;
+  static int
+    valid = 0;
 
   PyObject
     *lattice;
@@ -514,7 +494,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     integrator = integrator_list;
     pyintegrator = pyintegrator_list;
     for (elem_index = 0; elem_index < num_elements; elem_index++) {
-      PyObject *el = PyList_GET_ITEM(lattice, elem_index);
+      PyObject *el           = PyList_GET_ITEM(lattice, elem_index);
       PyObject *PyPassMethod = PyObject_GetAttrString(el, "PassMethod");
       double   length;
 
@@ -527,8 +507,10 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
 	return print_error(elem_index, rout);
       }
       length = PyFloat_AsDouble(PyObject_GetAttrString(el, "Length"));
-      if (PyErr_Occurred()) PyErr_Clear();
-      else lattice_length += length;
+      if (PyErr_Occurred())
+	PyErr_Clear();
+      else
+	lattice_length += length;
       *integrator++ = LibraryListPtr->FunctionHandle;
       *pyintegrator++ = LibraryListPtr->PyFunctionHandle;
       *element++ = el;
@@ -545,7 +527,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     track_function *integrator = integrator_list;
     PyObject       **pyintegrator = pyintegrator_list;
     PyObject       **kwargs = kwargs_list;
-    union elem **elemdata = elemdata_list;
+    union elem     **elemdata = elemdata_list;
 
     param.nturn = turn;
     nextrefindex = 0;
