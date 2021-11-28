@@ -5,6 +5,7 @@
 #include "tracy-2.h"
 
 #include "gwig.cc"
+#include "track.cc"
 
 
 inline std::vector<double> vectostl(const arma::vec &vec)
@@ -392,6 +393,50 @@ struct elem_type* init_corr(const PyObject *ElemData, struct elem_type *Elem)
 
     Elem->Length              = Length;
     Elem->corr_ptr->KickAngle = KickAngle;
+
+    return Elem;
+  } else
+    return NULL;
+}
+
+struct elem_type* init_H(const PyObject *ElemData, struct elem_type *Elem)
+{
+  long    max_order, num_int_steps, type, multipole_fringe;
+  double  *polynom_a, *polynom_b, phi, gK;
+  elem_H  *H;
+
+  Elem = init_elem(ElemData, Elem, true);
+  if (Elem) {
+    Elem->H_ptr = (struct elem_H*)malloc(sizeof(struct elem_H));
+    H           = Elem->H_ptr;
+
+    type = atGetLong(ElemData,                     (char*)"Type");
+    check_error();
+    num_int_steps = atGetLong(ElemData,            (char*)"NumIntSteps");
+    check_error();
+    max_order = atGetLong(ElemData,                (char*)"MaxOrder");
+    check_error();
+    multipole_fringe = atGetOptionalLong(ElemData, (char*)"MultipoleFringe", 0);
+    check_error();
+
+    polynom_a = atGetDoubleArray(ElemData,         (char*)"PolynomA");
+    check_error();
+    polynom_b = atGetDoubleArray(ElemData,         (char*)"PolynomB");
+    check_error();
+    phi = atGetOptionalDouble(ElemData,            (char*)"BendingAngle", 0.0);
+    check_error();
+    gK = atGetOptionalDouble(ElemData,             (char*)"gK", 0.0);
+    check_error();
+
+    H->Type            = type;
+    H->NumIntSteps     = num_int_steps;
+    H->MaxOrder        = max_order;
+    H->MultipoleFringe = multipole_fringe;
+
+    H->PolynomA        = polynom_a;
+    H->PolynomB        = polynom_b;
+    H->Phi             = phi;
+    H->gK              = gK;
 
     return Elem;
   } else
@@ -1069,6 +1114,28 @@ void WigPass(double ps[], const int num_particles,
 	       Elem->wig_ptr->Pmethod);
 	break;
       }
+    }
+  }
+}
+
+void HamPass(double ps[], const int num_particles,
+	     const struct elem_type *Elem)
+{
+  int    k;
+  double *ps_vect;
+
+  for(k = 0; k < num_particles; k++) {
+    ps_vect = ps+k*PS_DIM;
+    if(!atIsNaN(ps_vect[0])) {
+      /* misalignment at entrance */
+      if (Elem->T1) ATaddvv(ps_vect, Elem->T1);
+      if (Elem->R1) ATmultmv(ps_vect, Elem->R1);
+
+      track_element(ps_vect, Elem);
+
+      /* misalignment at exit */
+      if (Elem->R2) ATmultmv(ps_vect, Elem->R2);
+      if (Elem->T2) ATaddvv(ps_vect, Elem->T2);
     }
   }
 }

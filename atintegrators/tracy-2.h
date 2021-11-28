@@ -51,6 +51,15 @@ enum phase_space_ind
     delta_ = 4,
     ct_    = 5 };
 
+// Used by track.cc.
+enum element_type
+  {
+   drift = 0,
+   dipole,
+   multipole,
+   marker
+  };
+
 enum MpoleKind
   { All    = 0,
     Dip    = 1,
@@ -139,6 +148,23 @@ struct elem_corr {
   double *KickAngle;
 };
 
+struct elem_H {
+  int
+    Type,            /* type is defined in track.h:
+			- 0: drift
+			- 1: dipole
+			- 2: multipole
+			- 3: marker                   */
+    NumIntSteps,
+    MaxOrder,
+    MultipoleFringe; /* bool, whether to calculate multipole fringe */
+  double
+    *PolynomA,
+    *PolynomB,
+    Phi,             /* required for bend */
+    gK;              /* g * K, required for bend */
+};
+
 struct elem_type {
   double
     Length,
@@ -157,5 +183,6 @@ struct elem_type {
     elem_wig   *wig_ptr;
     elem_M66   *M66_ptr;
     elem_corr  *corr_ptr;
+    elem_H     *H_ptr;
   };
 };
