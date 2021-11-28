@@ -4,6 +4,8 @@
 
 #include "tracy-2.h"
 
+#include "gwig.cc"
+
 
 inline std::vector<double> vectostl(const arma::vec &vec)
 { return {vec(x_), vec(px_), vec(y_), vec(py_), vec(delta_), vec(ct_), 1e0}; }
@@ -93,6 +95,23 @@ struct elem_type* init_id(const PyObject *ElemData, struct elem_type *Elem)
   Elem = init_elem(ElemData, Elem, false);
   if (Elem) {
     Elem->id_ptr = (struct elem_id*)malloc(sizeof(struct elem_id));
+    return Elem;
+  } else
+    return NULL;
+}
+
+struct elem_type* init_ap(const PyObject *ElemData, struct elem_type *Elem)
+{
+  double *limits;
+
+  Elem = init_elem(ElemData, Elem, false);
+  if (Elem) {
+    Elem->ap_ptr = (struct elem_ap*)malloc(sizeof(struct elem_ap));
+
+    limits = atGetDoubleArray(ElemData, (char*)"Limits");
+    check_error();
+
+    Elem->ap_ptr->limits = limits;
     return Elem;
   } else
     return NULL;
@@ -238,6 +257,147 @@ struct elem_type* init_cav(const PyObject *ElemData, struct elem_type *Elem)
     return NULL;
 }
 
+struct elem_type* init_wig(const PyObject *ElemData, struct elem_type *Elem)
+{
+  int
+    i, Nstep, Nmeth, NHharm, NVharm;
+  double
+    *tmppr, kw, *By, *Bx, Lw, Bmax, Energy;
+  elem_wig *wig;
+
+  Elem = init_elem(ElemData, Elem, true);
+  if (Elem) {
+    Elem->wig_ptr = (struct elem_wig*)malloc(sizeof(struct elem_wig));
+    wig           = Elem->wig_ptr;
+
+    Nmeth  = atGetLong(ElemData,        (char*)"Nmeth");
+    check_error();
+    Nstep  = atGetLong(ElemData,        (char*)"Nstep");
+    check_error();
+    NHharm = atGetLong(ElemData,        (char*)"NHharm");
+    check_error();
+    NVharm = atGetLong(ElemData,        (char*)"NVharm");
+    check_error();
+
+    Energy = atGetDouble(ElemData,      (char*)"Energy");
+    check_error();
+    Lw     = atGetDouble(ElemData,      (char*)"Lw");
+    check_error();
+    Bmax   = atGetDouble(ElemData,      (char*)"Bmax");
+    check_error();
+    By     = atGetDoubleArray(ElemData, (char*)"By");
+    check_error();
+    Bx     = atGetDoubleArray(ElemData, (char*)"Bx");
+    check_error();
+
+    wig->Pmethod = Nmeth;
+    wig->PN      = Nstep;
+    wig->NHharm  = NHharm;
+    wig->NVharm  = NVharm;
+
+    wig->E0      = Energy/1e9;
+    wig->Lw      = Lw;
+    wig->PB0     = Bmax;
+
+    wig->Nw      = (int)(Elem->Length/Lw);
+
+    kw           = 2e0*PI/(wig->Lw);
+    wig->Zw      = 0e0;
+    wig->Aw      = 0e0;
+
+    tmppr = By;
+    for (i = 0; i < NHharm; i++) {
+      tmppr++;
+      wig->HCw[i] = 0e0;
+      wig->HCw_raw[i] = *tmppr;
+      tmppr++;
+      wig->Hkx[i] = (*tmppr) * kw;
+      tmppr++;
+      wig->Hky[i] = (*tmppr) * kw;
+      tmppr++;
+      wig->Hkz[i] = (*tmppr) * kw;
+      tmppr++;
+      wig->Htz[i] = *tmppr;
+      tmppr++;
+    }
+
+    tmppr = Bx;
+    for (i = 0; i < NVharm; i++) {
+      tmppr++;
+      wig->VCw[i] = 0e0;
+      wig->VCw_raw[i] = *tmppr;
+      tmppr++;
+      wig->Vkx[i] = (*tmppr) * kw;
+      tmppr++;
+      wig->Vky[i] = (*tmppr) * kw;
+      tmppr++;
+      wig->Vkz[i] = (*tmppr) * kw;
+      tmppr++;
+      wig->Vtz[i] = *tmppr;
+      tmppr++;
+    }
+
+    for (i = NHharm; i < WHmax; i++) {
+      wig->HCw[i]     = 0e0;
+      wig->HCw_raw[i] = 0e0;
+      wig->Hkx[i]     = 0e0;
+      wig->Hky[i]     = 0e0;
+      wig->Hkz[i]     = 0e0;
+      wig->Htz[i]     = 0e0;
+    }
+    for (i = NVharm; i < WHmax; i++) {
+      wig->VCw[i]     = 0e0;
+      wig->VCw_raw[i] = 0e0;
+      wig->Vkx[i]     = 0e0;
+      wig->Vky[i]     = 0e0;
+      wig->Vkz[i]     = 0e0;
+      wig->Vtz[i]     = 0e0;
+    }
+
+    return Elem;
+  } else
+    return NULL;
+}
+
+struct elem_type* init_M66(const PyObject *ElemData, struct elem_type *Elem)
+{
+  double *M66;
+
+  Elem = init_elem(ElemData, Elem, false);
+  if (Elem) {
+    Elem->M66_ptr = (struct elem_M66*)malloc(sizeof(struct elem_M66));
+
+    M66 = atGetDoubleArray(ElemData, (char*)"M66");
+    check_error();
+
+    Elem->M66_ptr->M66 = M66;
+
+    return Elem;
+  } else
+    return NULL;
+}
+
+struct elem_type* init_corr(const PyObject *ElemData, struct elem_type *Elem)
+{
+  double Length, *KickAngle;
+
+  Elem = init_elem(ElemData, Elem, true);
+  if (Elem) {
+    Elem->corr_ptr = (struct elem_corr*)malloc(sizeof(struct elem_corr));
+
+    Length = atGetDouble(ElemData, "Length");
+    check_error();
+    KickAngle = atGetDoubleArray(ElemData, (char*)"KickAngle");
+    check_error();
+
+    Elem->Length              = Length;
+    Elem->corr_ptr->KickAngle = KickAngle;
+
+    return Elem;
+  } else
+    return NULL;
+}
+
 #if 1
 
 //------------------------------------------------------------------------------
@@ -373,14 +533,16 @@ void Drift(double L, std::vector<double> &ps)
   if (false) ps[ct_] += L;
 }
 
-void Cav_Pass(const double L, const double f_RF, const double VoE0,
+#include <iomanip>
+
+void Cav_Pass(const double L, const double f_RF, const double V_RFoE0,
 	      const double phi, std::vector<double> &ps)
 {
   double delta;
 
   Drift(L/2e0, ps);
-  if (VoE0 != 0e0) {
-    delta = -VoE0*sin(2e0*M_PI*f_RF/C0*ps[ct_]+phi);
+  if (V_RFoE0 != 0e0) {
+    delta = -V_RFoE0*sin(2e0*M_PI*f_RF/C0*ps[ct_]+phi);
     ps[delta_] += delta;
 
     // if (globval.radiation) globval.dE -= is_double<T>::cst(delta);
@@ -388,6 +550,10 @@ void Cav_Pass(const double L, const double f_RF, const double VoE0,
     // if (globval.pathlength) ps[ct_] -= C->Ph/C->Pfreq*c0;
   }
   Drift(L/2e0, ps);
+  for (int k = 0; k < 6; k++)
+    std::cout << std::scientific << std::setprecision(3) << std::setw(11)
+	      << ps[k];
+  std::cout << "\n";
 }
 
 //------------------------------------------------------------------------------
@@ -433,14 +599,18 @@ void thin_kick(double ps[], const double a[], const double b[],
   stltoarr(ps_stl, ps);
 }
 
-void cav_pass(double ps[], const double L, const double VoE0,
+void cav_pass(double ps[], const double L, const double V_RFoE0,
 	      const double f_RF, const double lag)
 {
   std::vector<double> ps_stl = arrtostl(ps);
 
+#if 0
   const double phi = -lag*2e0*M_PI*f_RF/C0;
+#else
+  const double phi = -lag*TWOPI*f_RF/C0;
+#endif
 
-  Cav_Pass(L, f_RF, VoE0, phi, ps_stl);
+  Cav_Pass(L, f_RF, V_RFoE0, phi, ps_stl);
   stltoarr(ps_stl, ps);
 }
 
@@ -624,7 +794,7 @@ void IdentityPass(double ps[], const int num_particles,
   double *ps_vec;
     
   for (k = 0; k < num_particles; k++) {	/*Loop over particles  */
-    ps_vec = ps+k*6;
+    ps_vec = ps+k*PS_DIM;
     if (!atIsNaN(ps_vec[0])) {
       /*  misalignment at entrance  */
       if (Elem->T1) ATaddvv(ps_vec, Elem->T1);
@@ -635,6 +805,23 @@ void IdentityPass(double ps[], const int num_particles,
       /* Misalignment at exit */
       if (Elem->R2) ATmultmv(ps_vec, Elem->R2);
       if (Elem->T2) ATaddvv(ps_vec, Elem->T2);
+    }
+  }
+}
+
+void AperturePass(double ps[], int num_particles, const struct elem_type *Elem)
+{
+  /* Checks X and Y of each input 6-vector and marks the corresponding element
+     in lossflag array with 0 if X,Y are exceed the limits given by limitsptr
+     array limitsptr has 4 elements: (MinX, MaxX, MinY, MaxY)                 */
+  int    k;
+  double *ps_vec;
+
+  for (k = 0; k < num_particles; k++) {
+    ps_vec = ps+k*PS_DIM;
+    if (!atIsNaN(ps_vec[0])) {
+	/*  check if this particle is already marked as lost */
+	checkiflostRectangularAp(ps_vec, Elem->ap_ptr->limits);
     }
   }
 }
@@ -652,7 +839,7 @@ void DriftPass(double *ps, const int num_particles,
   default(shared) shared(ps, num_particles) private(k, ps_vec)
 
   for (k = 0; k < num_particles; k++) { /*Loop over particles  */
-    ps_vec = ps+k*6;
+    ps_vec = ps+k*PS_DIM;
     if(!atIsNaN(ps_vec[0])) {
       /*  misalignment at entrance  */
       if (Elem->T1) ATaddvv(ps_vec, Elem->T1);
@@ -706,7 +893,7 @@ void MpolePass(double ps[], const int num_particles,
   private(k)
 
   for(k = 0; k < num_particles; k++) {	/* Loop over particles  */
-    ps_vec = ps+k*6;
+    ps_vec = ps+k*PS_DIM;
     if (!atIsNaN(ps_vec[0])) {
       int    m;
       double norm = 1.0/(1.0+ps_vec[4]), NormL1 = L1*norm, NormL2 = L2*norm;
@@ -792,9 +979,96 @@ void CavityPass(double ps[], const int num_particles,
   const elem_cav *cav = Elem->cav_ptr;
 
   for(k = 0; k < num_particles; k++) {
-    ps_vec = ps+k*6;
+    ps_vec = ps+k*PS_DIM;
     if(!atIsNaN(ps_vec[0]))
-      cav_pass(ps_vec,  Elem->Length, cav->Voltage, cav->Frequency,
+      cav_pass(ps_vec,  Elem->Length, cav->Voltage/cav->Energy, cav->Frequency,
 	       cav->TimeLag);
+  }
+}
+
+void Matrix66Pass(double ps[], const int num_particles,
+		  const struct elem_type *Elem)
+{
+  int    k;
+  double *ps_vec;
+
+  for (k = 0; k < num_particles; k++) {	/*Loop over particles  */
+    ps_vec = ps+k*PS_DIM;
+    if (!atIsNaN(ps_vec[0])) {
+      if (Elem->T1 != NULL) ATaddvv(ps_vec, Elem->T1);
+      if (Elem->R1 != NULL) ATmultmv(ps_vec, Elem->R1);
+      ATmultmv(ps_vec, Elem->M66_ptr->M66);
+      if (Elem->R2 != NULL) ATmultmv(ps_vec, Elem->R2);
+      if (Elem->T2 != NULL) ATaddvv(ps_vec, Elem->T2);
+    }
+  }
+}
+
+void CorrectorPass(double ps[], const int num_particles,
+		   const struct elem_type *Elem)
+/* xkick, ykick - horizontal and vertical kicks in radiand 
+   r - 6-by-N matrix of initial conditions reshaped into 
+   1-d array of 6*N elements                                                  */
+{
+  int    k;
+  double *ps_vec, xkick, ykick;
+
+  if (Elem->Length == 0e0)
+    for(k = 0; k < num_particles; k++) {
+      ps_vec = ps+k*PS_DIM;
+      if(!atIsNaN(ps[0])) {
+	ps[1] += Elem->corr_ptr->KickAngle[0];
+	ps[3] += Elem->corr_ptr->KickAngle[1]; 		    
+      }
+    }
+  else {
+
+#pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD)    \
+  default(none) shared(ps, num_particles, len, xkick, ykick) private(c)
+
+    xkick = Elem->corr_ptr->KickAngle[0];
+    ykick = Elem->corr_ptr->KickAngle[1];
+    for(k = 0; k < num_particles; k++) {
+      ps_vec = ps+k*PS_DIM;
+      if(!atIsNaN(ps[0])) {
+	double
+	  p_norm = 1/(1+ps[4]),
+	  NormL  = Elem->Length*p_norm;
+
+	ps[5] +=
+	  NormL*p_norm*(xkick*xkick/3 + ykick*ykick/3 + ps[1]*ps[1]
+			+ ps[3]*ps[3] + ps[1]*xkick + ps[3]*ykick)/2;
+
+	ps[0] += NormL*(ps[1]+xkick/2);
+	ps[1] += xkick;
+	ps[2] += NormL*(ps[3]+ykick/2);
+	ps[3] += ykick;
+      }
+    }
+  }
+}
+
+void WigPass(double ps[], const int num_particles,
+	     const struct elem_type *Elem)
+{
+  int    k;
+  double *ps_vec;
+
+  for (k = 0; k < num_particles; k++) {
+    ps_vec = ps+k*PS_DIM;
+    if (!atIsNaN(ps_vec[0])) {
+      switch (Elem->wig_ptr->Pmethod) {
+      case second:
+	GWigPass_2nd(Elem, ps_vec);
+	break;
+      case fourth:
+	GWigPass_4th(Elem, ps_vec);
+	break;
+      default:
+	printf("Invalid wiggler integration method %d.\n",
+	       Elem->wig_ptr->Pmethod);
+	break;
+      }
+    }
   }
 }

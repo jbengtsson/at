@@ -15,6 +15,25 @@
 #define KICK1     1.351207191959657328
 #define KICK2    -1.702414383919314656
 
+#define WHmax    200
+#define GWIG_EPS (1e-6)
+#define second   2
+#define fourth   4
+
+
+static const int
+  Elem_Entrance =  1,
+  Elem_Exit     = -1;
+
+static const double
+  q_e       = 1.602176462e-19, /* electron charge, [C] */
+  m_e       = 9.10938188e-31,  /* electron mass, [kg] */
+  clight    = 2.99792458e8,    /* speed of light [m/s] */
+  r_e       = 2.817940285e-15, /* electron classic radius, [m] */
+  XMC2      = 0.510998902e-03, /* mc^2 in GeV */
+  PI        = 3.141592653589793238462643383279502884197e0,
+  epsilon_o = 8.854187817e-12; /* Vacuum permittivity */
+
 
 double C_u, C_gamma, C_q, cl_rad, q_fluct;
 
@@ -42,6 +61,10 @@ enum MpoleKind
     Dodec  = 6 };
 
 struct elem_id { };
+
+struct elem_ap {
+  double *limits;
+};
 
 struct elem_drift { };
 
@@ -80,6 +103,42 @@ struct elem_cav {
     TimeLag;
 };
 
+struct elem_wig {
+  int
+    Pmethod,        /* Integration Method */
+    PN,             /* Number of integration steps */
+    Nw,             /* Number of periods */
+    NHharm,         /* No. of horizontal harmonics */
+    NVharm;         /* No. of vertical harmonics */
+  double
+    E0,             /* Energy of ring, [GeV] */
+    PB0,            /* B0 in [Tesla] */
+    Lw,             /* Wiggler Period [m] */
+
+    Zw,             /* Longitudinal variable [m] */
+    Aw,             /* Wiggler parameter */
+    HCw[WHmax],
+    VCw[WHmax],
+    HCw_raw[WHmax],
+    VCw_raw[WHmax],
+    Hkx[WHmax],
+    Hky[WHmax],
+    Hkz[WHmax],
+    Htz[WHmax],
+    Vkx[WHmax],
+    Vky[WHmax],
+    Vkz[WHmax],
+    Vtz[WHmax];
+};
+
+struct elem_M66 {
+  double *M66;
+};
+
+struct elem_corr {
+  double *KickAngle;
+};
+
 struct elem_type {
   double
     Length,
@@ -91,8 +150,12 @@ struct elem_type {
     *RApertures;
   union {
     elem_id    *id_ptr;
+    elem_ap    *ap_ptr;
     elem_drift *drift_ptr;
     elem_mpole *mpole_ptr;
     elem_cav   *cav_ptr;
+    elem_wig   *wig_ptr;
+    elem_M66   *M66_ptr;
+    elem_corr  *corr_ptr;
   };
 };

@@ -94,6 +94,42 @@ def example(ring):
         for fld in beamdata.dtype.fields.keys():
             print(fld)
 
+def tst_cases:
+    import numpy
+    from at import elements, atpass
+
+    # test_missing_pass_method_raises_attribute_error.
+    lat = [elements.Marker('marker')]
+    ps = numpy.zeros(6,)
+    print('\n', lat[0])
+    del lat[0].PassMethod
+    atpass(lat, ps, 1)
+
+    # test_missing_length_raises_attribute_error.
+    lat = [elements.Drift('drift', 1.0)]
+    ps = numpy.zeros(6,)
+    ps[1] = 1e-6
+    del lat[0].Length
+    atpass(lat, ps, 1)
+
+    # test_quad.
+    q = elements.Quadrupole('quad', 0.4, k=1)
+    lattice = [q]
+    ps = numpy.array(numpy.zeros((6, 1)), order='F')
+    ps[0, 0] = 1e-6
+    atpass(lattice, ps, 1)
+    print(ps)
+
+    # test_rfcavity.
+    rf = elements.RFCavity('rfcavity', 0.0, 187500, 3.5237e+8, 31, 6.e+9)
+    print(rf)
+    lattice = [rf, rf, rf, rf]
+    ps = numpy.array(numpy.zeros((6, 1)), order='F')
+    ps[4, 0] = 1e-6
+    ps[5, 0] = 1e-6
+    atpass(lattice, ps, 1)
+    print(ps)
+
 lat_dir = os.environ['LAT']
 
 lat_name = {
