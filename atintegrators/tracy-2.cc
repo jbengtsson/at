@@ -1038,11 +1038,106 @@ void bndstrthinkick(double ps[], double* A, double* B, double L, double irho,
 
 //------------------------------------------------------------------------------
 
+static void drift6(double* r, double L)
+/*   Input parameter L is the physical length
+     1/(1+delta) normalization is done internally
+*/
+{	double p_norm = 1/(1+r[4]); 
+	double NormL  = L*p_norm;   
+	r[0]+= NormL*r[1]; 
+	r[2]+= NormL*r[3];
+	r[5]+= NormL*p_norm*(r[1]*r[1]+r[3]*r[3])/2;
+}
+
+static double B2perp(double bx, double by, double irho,
+		     double x, double xpr, double y, double ypr)
+/* Calculates sqr(|e x B|) , where e is a unit vector in the direction of
+   velocity                                                                   */
+        
+{
+  double v_norm2 = 1/(SQR(1+x*irho)+ SQR(xpr) + SQR(ypr));
+    
+  /* components of the  velocity vector
+   * double ex, ey, ez;
+   * ex = xpr;
+   * ey = ypr;
+   * ez = (1+x*irho);
+   */
+    
+  return ((SQR(by*(1+x*irho)) + SQR(bx*(1+x*irho))
+	   + SQR(bx*ypr - by*xpr) )*v_norm2) ;
+}
+
+static void bndthinkickrad(double* r, double* A, double* B, double L,
+			   double irho, double E0, int max_order)
+
+/*****************************************************************************
+Calculate multipole kick in a curved elemrnt (bending magnet)
+The reference coordinate system  has the curvature given by the inverse
+(design) radius irho.
+IMPORTANT !!!
+The magnetic field Bo that provides this curvature MUST NOT be included in the dipole term
+PolynomB[1](MATLAB notation)(C: B[0] in this function) of the By field expansion
+HOWEVER!!! to calculate the effect of classical radiation the full field must be
+used in the square of the |v x B|.
+When calling B2perp(Bx, By, ...), use the By = RESum + irho, where ImSum is the sum of
+the polynomial terms in PolynomB.
+
+ The kick is given by
+ 
+             e L      L delta      L x
+  theta  = - --- B  + -------  -  -----  ,
+       x      p   y     rho           2
+               0                   rho
+ 
+           e L
+  theta  = --- B
+       y    p   x
+             0
+ 
+ ******************************************************************************/
+{
+   int i;
+   double ImSum = A[max_order];
+   double ReSum = B[max_order];
+   double ReSumTemp;
+   double x ,xpr, y, ypr, p_norm,dp_0, B2P;
+   double CRAD = CGAMMA*E0*E0*E0/(TWOPI*1e27);	/* [m]/[GeV^3] M.Sands (4.1) */
+   
+   /* recursively calculate the local transvrese magnetic field
+     Bx = ReSum, By = ImSum                                                   */
+   for (i=max_order-1; i>=0; i--) {
+   	ReSumTemp = ReSum*r[0] - ImSum*r[2] + B[i];
+        ImSum = ImSum*r[0] +  ReSum*r[2] + A[i];
+        ReSum = ReSumTemp;
+   }
+   
+   /* calculate angles from momentums 	*/
+   p_norm = 1/(1+r[4]);
+   x   = r[0];
+   xpr = r[1]*p_norm;
+   y   = r[2];
+   ypr = r[3]*p_norm;
+   
+   B2P = B2perp(ImSum, ReSum +irho, irho, x , xpr, y ,ypr);
+   
+   dp_0 = r[4];
+   r[4] = r[4] - CRAD*SQR(1+r[4])*B2P*(1 + x*irho + (SQR(xpr)+SQR(ypr))/2 )*L;
+   
+   /* recalculate momentums from angles after losing energy for radiation */
+   p_norm = 1/(1+r[4]);
+   r[1] = xpr/p_norm;
+   r[3] = ypr/p_norm;
+   
+   r[1] -=  L*(ReSum-(dp_0-r[0]*irho)*irho);
+   r[3] +=  L*ImSum;
+   r[5] +=  L*irho*r[0]; /* pathlength */
+}
+
 double StrB2perp(double bx, double by, double x, double xpr, double y,
 		 double ypr)
 /* Calculates sqr(|B x e|) , where e is a unit vector in the direction of
    velocity                                                                   */
-
 {
   double v_norm2;
 
@@ -1095,7 +1190,7 @@ static void strthinkickrad(double ps[], const double A[], const double B[],
   ypr = ps[3]*p_norm;
    
   /*B2P = B2perp(ImSum, ReSum +irho, irho, x , xpr, y ,ypr);*/
-  B2P = StrB2perp(ImSum, ReSum , x , xpr, y ,ypr);
+  B2P = StrB2perp(ImSum, ReSum, x , xpr, y, ypr);
    
   dp_0 = ps[4];
   ps[4] = ps[4] - CRAD*SQR(1+ps[4])*B2P*(1 + x*irho + (SQR(xpr)+SQR(ypr))/2 )*L;
@@ -1299,8 +1394,7 @@ void MpoleRadPass(double ps[], const int num_particles,
 		  const struct elem_type *Elem)
 {
   int    k, m;
-  double *ps_vect;
-  double SL, L1, L2, K1, K2;
+  double *ps_vect, SL, L1, L2, K1, K2;
 
   const elem_mpole *mpole = Elem->mpole_ptr;
 
@@ -1378,6 +1472,89 @@ void MpoleRadPass(double ps[], const int num_particles,
   if (mpole->KickAngle) {
     /* Remove corrector component in polynomial coefficients */
     mpole->PolynomB[0] += sin(mpole->KickAngle[0])/Elem->Length; 
+    mpole->PolynomA[0] -= sin(mpole->KickAngle[1])/Elem->Length;
+  }
+}
+
+void BendRadPass(double ps[], const int num_particles,
+		 const struct elem_type *Elem)
+        
+{	
+  int    k, m;
+  double *ps_vect, SL, L1, L2, K1, K2;
+
+  const elem_mpole *mpole = Elem->mpole_ptr;
+
+  const bool
+    useLinFrEleEntrance =
+    (mpole->fringeIntM0 != NULL && mpole->fringeIntP0 != NULL
+     && mpole->FringeQuadEntrance == 2),
+    useLinFrEleExit =
+    (mpole->fringeIntM0 != NULL && mpole->fringeIntP0 != NULL
+     && mpole->FringeQuadExit == 2);
+
+  SL = Elem->Length/mpole->NumIntSteps;
+  L1 = SL*DRIFT1;
+  L2 = SL*DRIFT2;
+  K1 = SL*KICK1;
+  K2 = SL*KICK2;
+    
+  if (mpole->KickAngle) {
+    /* Convert corrector component to polynomial coefficients */
+    mpole->PolynomB[0] -= sin(mpole->KickAngle[0])/Elem->Length;
+    mpole->PolynomA[0] += sin(mpole->KickAngle[1])/Elem->Length;
+  }
+#pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD)	\
+  default(shared) shared(r, num_particles) private(c, ps_vect, m)
+
+  for(k = 0; k < num_particles; k++) { /* Loop over particles */
+    ps_vect = ps+k*PS_DIM;
+    if(!atIsNaN(ps_vect[0])) {
+      /*  misalignment at entrance  */
+      if (Elem->T1) ATaddvv(ps_vect, Elem->T1);
+      if (Elem->R1) ATmultmv(ps_vect, Elem->R1);
+      /* Check physical apertures at the entrance of the magnet */
+      if (Elem->RApertures) checkiflostRectangularAp(ps_vect, Elem->RApertures);
+      if (Elem->EApertures) checkiflostEllipticalAp(ps_vect, Elem->EApertures);
+      /* edge focus */
+      edge_fringe_entrance(ps_vect, mpole->irho, mpole->EntranceAngle, mpole->FringeInt1, mpole->FullGap, mpole->FringeBendEntrance);
+      /* quadrupole gradient fringe */
+      if (mpole->FringeQuadEntrance && mpole->PolynomB[1]!=0) {
+	if (useLinFrEleEntrance) /*Linear fringe fields from elegant*/
+	  linearQuadFringeElegantEntrance(ps_vect, mpole->PolynomB[1], mpole->fringeIntM0, mpole->fringeIntP0);
+	else
+	  QuadFringePassP(ps_vect, mpole->PolynomB[1]);
+      }
+      /* integrator  */
+      for(m = 0; m < mpole->NumIntSteps; m++) { /* Loop over slices */
+	drift6(ps_vect, L1);
+	bndthinkickrad(ps_vect, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho, mpole->Energy, mpole->MaxOrder);
+	drift6(ps_vect, L2);
+	bndthinkickrad(ps_vect, mpole->PolynomA, mpole->PolynomB, K2, mpole->irho, mpole->Energy, mpole->MaxOrder);
+	drift6(ps_vect, L2);
+	bndthinkickrad(ps_vect, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho, mpole->Energy, mpole->MaxOrder);
+	drift6(ps_vect, L1);
+      }
+      /* quadrupole gradient fringe */
+      if (mpole->FringeQuadExit && mpole->PolynomB[1]!=0) {
+	if (useLinFrEleExit) /*Linear fringe fields from elegant*/
+	  linearQuadFringeElegantExit(ps_vect, mpole->PolynomB[1], mpole->fringeIntM0, mpole->fringeIntP0);
+	else
+	  QuadFringePassN(ps_vect, mpole->PolynomB[1]);
+      }
+      /* edge focus */
+      edge_fringe_exit(ps_vect, mpole->irho, mpole->ExitAngle, mpole->FringeInt2, mpole->FullGap, mpole->FringeBendExit);
+      /* Check physical apertures at the exit of the magnet */
+      if (Elem->RApertures) checkiflostRectangularAp(ps_vect, Elem->RApertures);
+      if (Elem->EApertures) checkiflostEllipticalAp(ps_vect, Elem->EApertures);
+      /* Misalignment at exit */
+      if (Elem->R2) ATmultmv(ps_vect, Elem->R2);
+      if (Elem->T2) ATaddvv(ps_vect, Elem->T2);
+    }
+  }
+  if (mpole->KickAngle) {
+    /* Remove corrector component in polynomial coefficients */
+    mpole->PolynomB[0] += sin(mpole->KickAngle[0])/Elem->Length;
     mpole->PolynomA[0] -= sin(mpole->KickAngle[1])/Elem->Length;
   }
 }
