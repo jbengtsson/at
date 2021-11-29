@@ -135,7 +135,7 @@ struct elem_type* init_drift(const PyObject *ElemData, struct elem_type *Elem)
 
 struct elem_type*
 init_mpole(const PyObject *ElemData, struct elem_type *Elem, const bool bend,
-	   const bool cbend, const bool incl_E0)
+	   const bool cbend, const bool incl_E0, const bool incl_E2)
 {
   int
     MaxOrder, NumIntSteps,  FringeBendEntrance, FringeBendExit,
@@ -143,7 +143,7 @@ init_mpole(const PyObject *ElemData, struct elem_type *Elem, const bool bend,
   double
     BendingAngle, EntranceAngle, ExitAngle, FullGap, FringeInt1, FringeInt2,
     *PolynomA, *PolynomB, *fringeIntM0, *fringeIntP0, *KickAngle, X0ref,
-    ByError, RefDZ, Energy;
+    ByError, RefDZ, Energy, h1, h2;
   elem_mpole
     *mpole;
 
@@ -199,6 +199,13 @@ init_mpole(const PyObject *ElemData, struct elem_type *Elem, const bool bend,
       check_error();
     }
 
+    if (incl_E2) {
+      h1 = atGetOptionalDouble(ElemData,              (char*)"H1", 0);
+      check_error();
+      h2 = atGetOptionalDouble(ElemData,              (char*)"H2", 0);
+      check_error();
+    }
+
     FringeQuadEntrance =
       atGetOptionalLong(ElemData,                    (char*)"FringeQuadEntrance",
 			0);
@@ -250,6 +257,11 @@ init_mpole(const PyObject *ElemData, struct elem_type *Elem, const bool bend,
       mpole->X0ref   = 0e0;
       mpole->ByError = 0e0;
       mpole->RefDZ   = 0e0;
+    }
+
+    if (incl_E2) {
+      mpole->H1      = h1;
+      mpole->H2      = h2;
     }
 
     mpole->irho = (Elem->Length != 0e0)? mpole->BendingAngle/Elem->Length : 0e0;
@@ -1207,6 +1219,161 @@ static void strthinkickrad(double ps[], const double A[], const double B[],
 
 //------------------------------------------------------------------------------
 
+static void edge_fringe2A(double* r, double inv_rho, double edge_angle,
+			  double fint, double gap,double h1,double K1)
+{
+  /* Entrance Fringe field transport map to second order in dipoles with
+     fringe field                                                             */
+  double fx = inv_rho*tan(edge_angle);
+  double dpsi =
+    inv_rho*gap*fint*(1+sin(edge_angle)*sin(edge_angle))/cos(edge_angle);
+  /* /(1+r[4]); */
+  double psi_bar = edge_angle-dpsi;
+  double fy = inv_rho*tan(psi_bar);
+  double h = inv_rho;
+  double tpsi=tan(edge_angle), tpsib=tan(psi_bar);
+  double spsi=1.0/cos(edge_angle);
+  /* spsib=1.0/cos(psi_bar) */
+  double T111,T234,T414,   T212,T313,  T133,T423,T211,T233,T413;
+    
+  double r0=r[0],r2=r[2],r1=r[1];
+  T111 = -0.5*h*tpsi*tpsi;
+  /*  T234=  -0.5*h*tpsi*tpsib;    */
+  T234=  -0.5*h*tpsi*tpsi;
+  T414=T234;
+  T212 = -T111;
+  T313 = -T234;
+  T133 = 0.5*h*spsi*spsi;  T423=-T133;
+  T211 = 0.5*h*h1*spsi*spsi*spsi + K1*tpsi;
+  T233 = -0.5*h*h1*spsi*spsi*spsi -K1*tpsi+0.5*h*h*tpsi*(tpsib*tpsib+spsi*spsi);
+  T413 = -0.5*h*h1*spsi*spsi*spsi -K1*tpsi;
+  /*-0.5*h*h*tpsi*(spsi*spsi+tpsib*tpsib);*/
+    
+  r[0] += T111*r[0]*r[0]+T133*r[2]*r[2];
+  r[1] += r0*fx + 2*T212*r0*r[1]+2*T234*r[2]*r[3]+T211*r0*r0+T233*r[2]*r[2] ;
+  r[2] += 2*T313*r0*r[2];
+  r[3] += -r2*fy + 2*T414*r0*r[3]+2*T413*r0*r2+2*T423*r1*r2 ;
+    
+}
+
+static void edge_fringe2B(double* r, double inv_rho, double edge_angle, double fint, double gap,double h2,double K1)
+{   /* Exit Fringe field transport map to second order in dipoles with fringe field */
+    double fx = inv_rho*tan(edge_angle);
+    double dpsi = inv_rho*gap*fint*(1+sin(edge_angle)*sin(edge_angle))/cos(edge_angle); /* /(1+r[4]);  */
+    double psi_bar = edge_angle-dpsi;
+    double fy = inv_rho*tan(psi_bar);
+    double h = inv_rho;
+    double tpsi=tan(edge_angle), tpsib=tan(psi_bar);
+    double spsi=1.0/cos(edge_angle); /* spsib=1.0/cos(psi_bar) */
+    double T111,T234,T414,   T212,T313,  T133,T423,T211,T233,T413;
+    
+    double r0=r[0],r2=r[2],r1=r[1];
+    T111 = 0.5*h*tpsi*tpsi;
+    /*  T234=  0.5*h*tpsi*tpsib;    */
+    T234=  0.5*h*tpsi*tpsi;
+    T414=T234;
+    T212 = -T111;
+    T313 = -T234;
+    T133 = -0.5*h*spsi*spsi;  T423=-T133;
+    T211 = 0.5*h*h2*spsi*spsi*spsi +K1*tpsi-0.5*h*h*tpsi*tpsi*tpsi;
+    T233 = -0.5*h*h2*spsi*spsi*spsi -K1*tpsi-0.5*h*h*tpsi*tpsib*tpsib;
+    T413 = -0.5*h*h2*spsi*spsi*spsi -K1*tpsi+0.5*h*h*tpsi*(spsi*spsi);
+    
+    r[0] += T111*r[0]*r[0]+T133*r[2]*r[2];
+    r[1] += r0*fx + 2*T212*r0*r[1]+2*T234*r[2]*r[3]+T211*r0*r0+T233*r[2]*r[2] ;
+    r[2] += 2*T313*r0*r[2];
+    r[3] += -r2*fy + 2*T414*r0*r[3]+2*T413*r0*r2+2*T423*r1*r2 ;
+    
+}
+
+/* This code was modified from the original BndMPoleSymplectic4Pass.c of AT
+ to correctly integrate the Hamiltonian in  the curvilinear coordinate 
+system of the dipole and to include the second order Transport map of the
+ fringe field. New version created by Xiaobiao Huang in March 2009, in final
+ verified version in August 2009.                                             */
+
+void edge_fringe2A(double* r, double inv_rho, double edge_angle, double fint,
+		   double gap,double h1,double K1);
+void edge_fringe2B(double* r, double inv_rho, double edge_angle, double fint,
+		   double gap,double h2,double K1);
+void ATmultmv(double *r, const double* A);
+void ATaddvv(double *r, const double *dr);
+
+/*original kick function by Andrei Terebilo*/
+static void bndthinkick0(double* r, double* A, double* B, double L,
+			 double irho, int max_order)
+{
+  int    i;
+  double ReSum = B[max_order];
+  double ImSum = A[max_order];
+  double ReSumTemp;
+  /* recursively calculate the local transvrese magnetic field
+     Bx = ReSum, By = ImSum
+  */
+  for(i = max_order-1; i >= 0; i--) {
+    ReSumTemp = ReSum*r[0] - ImSum*r[2] + B[i];
+    ImSum = ImSum*r[0] +  ReSum*r[2] + A[i];
+    ReSum = ReSumTemp;
+  }
+  r[1] -=  L*(ReSum-(r[4]-r[0]*irho)*irho);
+  r[3] +=  L*ImSum;
+  r[5] +=  L*irho*r[0]; /* pathlength */
+}
+
+static void bndthinkick(double* r, double* A, double* B, double L, double h,
+			int max_order)
+/*****************************************************************************
+(1) PolynomA is neglected.
+(2) The vector potential is expanded up to 4th order of x and y. 
+(3) Coefficients in PolynomB higher than 4th order is treated as if they are on straight geometry.
+(4) The Hamiltonian is H2 = - h x delta - (1+h x)As/Brho-B0 x/Brho            */
+{
+  int    i;
+  double ReSum = 0; /*B[max_order];*/
+  double ImSum = 0; /*A[max_order];*/
+    
+  double ReSumTemp;
+  double K1,K2;
+    
+  K1 = B[1];
+  K2 = (max_order>=2) ? B[2] : 0;
+    
+  ReSum = B[max_order];
+  for (i = max_order-1; i >= 0; i--) {
+    ReSumTemp = ReSum*r[0] - ImSum*r[2] + B[i];
+    ImSum = ImSum*r[0] +  ReSum*r[2] ;
+    ReSum = ReSumTemp;
+  }
+    
+  r[1] -=
+    L*(-h*r[4] + ReSum + h*(h*r[0]+K1*(r[0]*r[0]-0.5*r[2]*r[2])
+			    +K2*(r[0]*r[0]*r[0]-4.0/3.0*r[0]*r[2]*r[2])));
+  r[3] +=
+    L*(ImSum+h*(K1*r[0]*r[2]+4.0/3.0*K2*r[0]*r[0]*r[2]+(h/6.0*K1-K2/3.0)*r[2]
+		*r[2]*r[2]));
+  r[5] +=  L*h*r[0]; /* pathlength */
+    
+}
+
+/* the pseudo-drift element described by Hamiltonian
+   H1 = (1+hx) (px^2+py^2)/2(1+delta),                                        */
+static void ATbendhxdrift6(double* r, double L,double h)
+{
+  double hs = h*L;
+  double i1pd = 1.0/(1+r[4]);
+  double x=r[0],px=r[1],py=r[3];
+
+  r[0] += (1+h*x)*px*i1pd*L+1/4.*hs*L*(px*px-py*py)*i1pd*i1pd;
+  /* (1.0/h+x)*((1.0+hs*px*i1pd/2.)*(1.0+hs*px*i1pd/2.)-(hs*py*i1pd/2.)
+     *(hs*py*i1pd/2.))-1./h;*/
+  r[1] -= hs*(px*px+py*py)*i1pd/2.0;
+	
+  r[2]+= (1.0+h*x)*i1pd*py*L*(1.+px*hs/2.0);
+  r[5]+= (1.0+h*x)*i1pd*i1pd*L/2.0*(px*px+py*py);
+}
+
+//------------------------------------------------------------------------------
+
 void IdentityPass(double ps[], const int num_particles,
 		  const struct elem_type *Elem)
 {
@@ -1281,7 +1448,7 @@ void DriftPass(double *ps, const int num_particles,
 void MpolePass(double ps[], const int num_particles,
 	       const struct elem_type *Elem)
 {
-  int    k;
+  int    k, m;
   double *ps_vec;
 
   const elem_mpole *mpole = Elem->mpole_ptr;
@@ -1312,10 +1479,9 @@ void MpolePass(double ps[], const int num_particles,
   shared(r, num_particles, Elem)					\
   private(k)
 
-  for(k = 0; k < num_particles; k++) {	/* Loop over particles  */
+  for (k = 0; k < num_particles; k++) {	/* Loop over particles  */
     ps_vec = ps+k*PS_DIM;
     if (!atIsNaN(ps_vec[0])) {
-      int    m;
       double norm = 1.0/(1.0+ps_vec[4]), NormL1 = L1*norm, NormL2 = L2*norm;
 
       /*  misalignment at entrance  */
@@ -1344,7 +1510,7 @@ void MpolePass(double ps[], const int num_particles,
       }    
 
       /* integrator */
-      for(m = 0; m < mpole->NumIntSteps; m++) { /* Loop over slices*/
+      for (m = 0; m < mpole->NumIntSteps; m++) { /* Loop over slices*/
 	fastdrift(ps_vec, NormL1);
 	thin_kick(ps_vec, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho,
 		    mpole->MaxOrder);
@@ -1517,33 +1683,43 @@ void BendRadPass(double ps[], const int num_particles,
       if (Elem->RApertures) checkiflostRectangularAp(ps_vect, Elem->RApertures);
       if (Elem->EApertures) checkiflostEllipticalAp(ps_vect, Elem->EApertures);
       /* edge focus */
-      edge_fringe_entrance(ps_vect, mpole->irho, mpole->EntranceAngle, mpole->FringeInt1, mpole->FullGap, mpole->FringeBendEntrance);
+      edge_fringe_entrance(ps_vect, mpole->irho, mpole->EntranceAngle,
+			   mpole->FringeInt1, mpole->FullGap,
+			   mpole->FringeBendEntrance);
       /* quadrupole gradient fringe */
       if (mpole->FringeQuadEntrance && mpole->PolynomB[1]!=0) {
 	if (useLinFrEleEntrance) /*Linear fringe fields from elegant*/
-	  linearQuadFringeElegantEntrance(ps_vect, mpole->PolynomB[1], mpole->fringeIntM0, mpole->fringeIntP0);
+	  linearQuadFringeElegantEntrance(ps_vect, mpole->PolynomB[1],
+					  mpole->fringeIntM0,
+					  mpole->fringeIntP0);
 	else
 	  QuadFringePassP(ps_vect, mpole->PolynomB[1]);
       }
       /* integrator  */
       for(m = 0; m < mpole->NumIntSteps; m++) { /* Loop over slices */
 	drift6(ps_vect, L1);
-	bndthinkickrad(ps_vect, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho, mpole->Energy, mpole->MaxOrder);
+	bndthinkickrad(ps_vect, mpole->PolynomA, mpole->PolynomB, K1,
+		       mpole->irho, mpole->Energy, mpole->MaxOrder);
 	drift6(ps_vect, L2);
-	bndthinkickrad(ps_vect, mpole->PolynomA, mpole->PolynomB, K2, mpole->irho, mpole->Energy, mpole->MaxOrder);
+	bndthinkickrad(ps_vect, mpole->PolynomA, mpole->PolynomB, K2,
+		       mpole->irho, mpole->Energy, mpole->MaxOrder);
 	drift6(ps_vect, L2);
-	bndthinkickrad(ps_vect, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho, mpole->Energy, mpole->MaxOrder);
+	bndthinkickrad(ps_vect, mpole->PolynomA, mpole->PolynomB, K1,
+		       mpole->irho, mpole->Energy, mpole->MaxOrder);
 	drift6(ps_vect, L1);
       }
       /* quadrupole gradient fringe */
       if (mpole->FringeQuadExit && mpole->PolynomB[1]!=0) {
 	if (useLinFrEleExit) /*Linear fringe fields from elegant*/
-	  linearQuadFringeElegantExit(ps_vect, mpole->PolynomB[1], mpole->fringeIntM0, mpole->fringeIntP0);
+	  linearQuadFringeElegantExit(ps_vect, mpole->PolynomB[1],
+				      mpole->fringeIntM0, mpole->fringeIntP0);
 	else
 	  QuadFringePassN(ps_vect, mpole->PolynomB[1]);
       }
       /* edge focus */
-      edge_fringe_exit(ps_vect, mpole->irho, mpole->ExitAngle, mpole->FringeInt2, mpole->FullGap, mpole->FringeBendExit);
+      edge_fringe_exit(ps_vect, mpole->irho, mpole->ExitAngle,
+		       mpole->FringeInt2, mpole->FullGap,
+		       mpole->FringeBendExit);
       /* Check physical apertures at the exit of the magnet */
       if (Elem->RApertures) checkiflostRectangularAp(ps_vect, Elem->RApertures);
       if (Elem->EApertures) checkiflostEllipticalAp(ps_vect, Elem->EApertures);
@@ -1804,6 +1980,89 @@ void CBendPass(double ps[], const int num_particles, elem_type *Elem)
       /* Misalignment at exit */
       if(useR2)	ATmultmv(ps_vect, Elem->R2);
       if(useT2)	ATaddvv(ps_vect, Elem->T2);
+    }
+  }
+}
+
+void MpoleE2Pass(double ps[], const int num_particles, elem_type *Elem)
+{
+  bool   useT1, useT2, useR1, useR2, useFringe1, useFringe2;
+  int    k, m;
+  double *ps_vec;
+    
+  const elem_mpole *mpole = Elem->mpole_ptr;
+
+  const double
+    SL = Elem->Length/mpole->NumIntSteps,
+    L1 = SL*DRIFT1,
+    L2 = SL*DRIFT2,
+    K1 = SL*KICK1,
+    K2 = SL*KICK2;
+    
+  useT1 = (Elem->T1 != NULL);
+  useT2 = (Elem->T2 != NULL);
+  useR1 = (Elem->R1 != NULL);
+  useR2 = (Elem->R2 != NULL);
+
+  /* if either is 0 - do not calculate fringe effects */
+  if(mpole->FringeInt1 == 0 || mpole->FullGap == 0)
+    useFringe1 = false;
+  else
+    useFringe1=true;
+  if(mpole->FringeInt2 == 0 || mpole->FullGap == 0)
+    useFringe2 = false;
+  else
+    useFringe2=true;
+    
+#pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD)    \
+  default(shared) shared(r, num_particles) private(c, ps_vec, m)
+
+  for(k = 0; k < num_particles; k++) { /* Loop over particles  */
+    ps_vec = ps+k*PS_DIM;
+    if(!atIsNaN(ps_vec[0])) {
+      /*  misalignment at entrance  */
+      if(useT1) ATaddvv(ps_vec, Elem->T1);
+      if(useR1) ATmultmv(ps_vec, Elem->R1);
+      /* Check physical apertures at the entrance of the magnet */
+      if (Elem->RApertures) checkiflostRectangularAp(ps_vec, Elem->RApertures);
+      if (Elem->EApertures) checkiflostEllipticalAp(ps_vec, Elem->EApertures);
+      /* edge focus */
+      if(useFringe1) {
+	edge_fringe2A(ps_vec, mpole->irho, mpole->EntranceAngle,
+		      mpole->FringeInt1, mpole->FullGap, mpole->H1,
+		      mpole->PolynomB[1]);
+      } else {
+	edge_fringe2A(ps_vec, mpole->irho, mpole->EntranceAngle, 0, 0,
+		      mpole->H1, mpole->PolynomB[1]);
+      }
+      /* integrator */
+      for(m = 0; m < mpole->NumIntSteps; m++) { /* Loop over slices*/
+	ps_vec = ps+k*PS_DIM;
+	ATbendhxdrift6(ps_vec, L1, mpole->irho);
+	bndthinkick(ps_vec, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho,
+		    mpole->MaxOrder);
+	ATbendhxdrift6(ps_vec,L2, mpole->irho);
+	bndthinkick(ps_vec, mpole->PolynomA, mpole->PolynomB, K2, mpole->irho,
+		    mpole->MaxOrder);
+	ATbendhxdrift6(ps_vec,L2, mpole->irho);
+	bndthinkick(ps_vec, mpole->PolynomA, mpole->PolynomB,  K1, mpole->irho,
+		    mpole->MaxOrder);
+	ATbendhxdrift6(ps_vec,L1, mpole->irho);
+      }
+      /* edge focus */
+      if(useFringe2) {
+	edge_fringe2B(ps_vec, mpole->irho, mpole->ExitAngle, mpole->FringeInt2,
+		      mpole->FullGap, mpole->H2, mpole->PolynomB[1]);
+      } else {
+	edge_fringe2B(ps_vec, mpole->irho, mpole->ExitAngle, 0, 0, mpole->H2,
+		      mpole->PolynomB[1]);
+      }
+      /* Check physical apertures at the exit of the magnet */
+      if (Elem->RApertures) checkiflostRectangularAp(ps_vec, Elem->RApertures);
+      if (Elem->EApertures) checkiflostEllipticalAp(ps_vec, Elem->EApertures);
+      /* Misalignment at exit */
+      if(useR2) ATmultmv(ps_vec, Elem->R2);
+      if(useT2) ATaddvv(ps_vec, Elem->T2);
     }
   }
 }

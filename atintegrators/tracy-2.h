@@ -105,8 +105,9 @@ struct elem_mpole {
     *KickAngle,
     X0ref,              // Cartesian bend.
     ByError,            //      ''
-    RefDZ;              //      ''
-
+    RefDZ,              //      ''
+    H1,
+    H2;                 // E2 mod.
 };
 
 struct elem_cav {

@@ -74,32 +74,6 @@ static void edgefringeB(double* r, double *B, double inv_rho, double edge_angle,
 
 }
 
-
-static double B2perp(double bx, double by, double irho,
-		     double x, double xpr, double y, double ypr)
-/* Calculates sqr(|e x B|) , where e is a unit vector in the direction of
-   velocity   */
-    
-{
-  double v_norm2;
-
-  v_norm2 = 1/(SQR(1+x*irho)+ SQR(xpr) + SQR(ypr));
-
-  /* components of the  velocity vector
-     double ex, ey, ez;
-     ex = xpr; 
-     ey = ypr; 
-     ez = (1+x*irho);
-  */
-  	
-  return((SQR(by*(1+x*irho)) + SQR(bx*(1+x*irho)) + SQR(bx*ypr - by*xpr) )
-	 *v_norm2);
-
-
-
-} 
- 
-
 static void thinkickrad(double* r, double* A, double* B, double L, double irho,
 			double E0, int max_order)
 
