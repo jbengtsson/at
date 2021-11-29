@@ -9,5 +9,3 @@
 #define atMalloc   malloc
 #define atCalloc   calloc
 #define atFree     free
-
-#define SQR(X) ((X)*(X))

@@ -56,7 +56,7 @@ void mattoarr(const arma::mat &A, double a[])
 //------------------------------------------------------------------------------
 
 struct elem_type* init_elem(const PyObject *ElemData, struct elem_type *Elem,
-			    const bool len)
+			    const bool len, const bool aper)
 {
   double Length, *R1, *R2, *T1, *T2, *EApertures, *RApertures;
 
@@ -75,25 +75,31 @@ struct elem_type* init_elem(const PyObject *ElemData, struct elem_type *Elem,
   check_error();
   T2 = atGetOptionalDoubleArray(ElemData, (char*)"T2");
   check_error();
-  EApertures = atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
-  check_error();
-  RApertures = atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
-  check_error();
+
+  if (aper) {
+    EApertures = atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
+    check_error();
+    RApertures = atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
+    check_error();
+  }
 
   Elem->Length     = Length;
   Elem->R1         = R1;
   Elem->R2         = R2;
   Elem->T1         = T1;
   Elem->T2         = T2;
-  Elem->EApertures = EApertures;
-  Elem->RApertures = RApertures;
+
+  if (aper) {
+    Elem->EApertures = EApertures;
+    Elem->RApertures = RApertures;
+  }
 
   return Elem;
 }
 
 struct elem_type* init_id(const PyObject *ElemData, struct elem_type *Elem)
 {
-  Elem = init_elem(ElemData, Elem, false);
+  Elem = init_elem(ElemData, Elem, false, true);
   if (Elem) {
     Elem->id_ptr = (struct elem_id*)malloc(sizeof(struct elem_id));
     return Elem;
@@ -105,7 +111,8 @@ struct elem_type* init_ap(const PyObject *ElemData, struct elem_type *Elem)
 {
   double *limits;
 
-  Elem = init_elem(ElemData, Elem, false);
+  Elem = (struct elem_type*)malloc(sizeof(struct elem_type));
+  Elem->Length = 0e0;
   if (Elem) {
     Elem->ap_ptr = (struct elem_ap*)malloc(sizeof(struct elem_ap));
 
@@ -120,7 +127,7 @@ struct elem_type* init_ap(const PyObject *ElemData, struct elem_type *Elem)
 
 struct elem_type* init_drift(const PyObject *ElemData, struct elem_type *Elem)
 {
-  Elem = init_elem(ElemData, Elem, true);
+  Elem = init_elem(ElemData, Elem, true, true);
   if (Elem) {
     Elem->drift_ptr = (struct elem_drift*)malloc(sizeof(struct elem_drift));
     return Elem;
@@ -129,62 +136,78 @@ struct elem_type* init_drift(const PyObject *ElemData, struct elem_type *Elem)
 }
 
 struct elem_type* init_mpole(const PyObject *ElemData, struct elem_type *Elem,
-			     const bool bend)
+			     const bool bend, const bool cbend)
 {
   int
     MaxOrder, NumIntSteps,  FringeBendEntrance, FringeBendExit,
     FringeQuadEntrance, FringeQuadExit;
   double
     BendingAngle, EntranceAngle, ExitAngle, FullGap, FringeInt1, FringeInt2,
-    *PolynomA, *PolynomB, *fringeIntM0, *fringeIntP0, *KickAngle;
+    *PolynomA, *PolynomB, *fringeIntM0, *fringeIntP0, *KickAngle, X0ref,
+    ByError, RefDZ;
   elem_mpole
     *mpole;
 
-  Elem = init_elem(ElemData, Elem, true);
+  Elem = init_elem(ElemData, Elem, true, !cbend);
   if (Elem) {
     Elem->mpole_ptr = (struct elem_mpole*)malloc(sizeof(struct elem_mpole));
     mpole           = Elem->mpole_ptr;
 
-    PolynomA = atGetDoubleArray(ElemData, (char*)"PolynomA");
+    PolynomA = atGetDoubleArray(ElemData,            (char*)"PolynomA");
     check_error();
-    PolynomB = atGetDoubleArray(ElemData, (char*)"PolynomB");
+    PolynomB = atGetDoubleArray(ElemData,            (char*)"PolynomB");
     check_error();
-    MaxOrder = atGetLong(ElemData, (char*)"MaxOrder");
+    MaxOrder = atGetLong(ElemData,                   (char*)"MaxOrder");
     check_error();
-    NumIntSteps = atGetLong(ElemData, (char*)"NumIntSteps");
+
+    NumIntSteps = atGetLong(ElemData,                (char*)"NumIntSteps");
     check_error();
 
     if (bend) {
-      BendingAngle = atGetDouble(ElemData, (char*)"BendingAngle");
+      BendingAngle = atGetDouble(ElemData,           (char*)"BendingAngle");
       check_error();
-      EntranceAngle = atGetDouble(ElemData, (char*)"EntranceAngle");
+      EntranceAngle = atGetDouble(ElemData,          (char*)"EntranceAngle");
       check_error();
-      ExitAngle = atGetDouble(ElemData, (char*)"ExitAngle");
+      ExitAngle = atGetDouble(ElemData,              (char*)"ExitAngle");
       check_error();
+
       FringeBendEntrance =
-	atGetOptionalLong(ElemData, (char*)"FringeBendEntrance", 1);
+	atGetOptionalLong(ElemData,                  (char*)"FringeBendEntrance",
+			  1);
       check_error();
-      FringeBendExit = atGetOptionalLong(ElemData, (char*)"FringeBendExit", 1);
+      FringeBendExit = atGetOptionalLong(ElemData,   (char*)"FringeBendExit", 1);
       check_error();
-      FullGap = atGetOptionalDouble(ElemData, (char*)"FullGap", 0);
+
+      FullGap = atGetOptionalDouble(ElemData,        (char*)"FullGap", 0);
       check_error();
-      FringeInt1 = atGetOptionalDouble(ElemData, (char*)"FringeInt1", 0);
+      FringeInt1 = atGetOptionalDouble(ElemData,     (char*)"FringeInt1", 0);
       check_error();
-      FringeInt2 = atGetOptionalDouble(ElemData, (char*)"FringeInt2", 0);
+      FringeInt2 = atGetOptionalDouble(ElemData,     (char*)"FringeInt2", 0);
+      check_error();
+    }
+
+    if (cbend) {
+      X0ref = atGetOptionalDouble(ElemData,          (char*)"X0ref", 0);
+      check_error();
+      ByError = atGetOptionalDouble(ElemData,        (char*)"ByError", 0);
+      check_error();
+      RefDZ = atGetOptionalDouble(ElemData,          (char*)"RefDZ", 0);
       check_error();
     }
 
     FringeQuadEntrance =
-      atGetOptionalLong(ElemData, (char*)"FringeQuadEntrance", 0);
+      atGetOptionalLong(ElemData,                    (char*)"FringeQuadEntrance",
+			0);
     check_error();
-    FringeQuadExit = atGetOptionalLong(ElemData, (char*)"FringeQuadExit", 0);
+    FringeQuadExit = atGetOptionalLong(ElemData,     (char*)"FringeQuadExit",
+				       0);
     check_error();
     fringeIntM0 = atGetOptionalDoubleArray(ElemData, (char*)"fringeIntM0");
     check_error();
     fringeIntP0 = atGetOptionalDoubleArray(ElemData, (char*)"fringeIntP0");
     check_error();
   
-    KickAngle = atGetOptionalDoubleArray(ElemData, (char*)"KickAngle");
+    KickAngle = atGetOptionalDoubleArray(ElemData,   (char*)"KickAngle");
     check_error();
         
     mpole->PolynomA    = PolynomA;
@@ -212,6 +235,16 @@ struct elem_type* init_mpole(const PyObject *ElemData, struct elem_type *Elem,
       mpole->FullGap            = 0e0;
     }
 
+    if (cbend) {
+      mpole->X0ref   = X0ref;
+      mpole->ByError = ByError;
+      mpole->RefDZ   = RefDZ;
+    } else {
+      mpole->X0ref   = 0e0;
+      mpole->ByError = 0e0;
+      mpole->RefDZ   = 0e0;
+    }
+
     mpole->irho = (Elem->Length != 0e0)? mpole->BendingAngle/Elem->Length : 0e0;
 
     mpole->FringeQuadEntrance = FringeQuadEntrance;
@@ -230,7 +263,7 @@ struct elem_type* init_cav(const PyObject *ElemData, struct elem_type *Elem)
   double   Length, Voltage, Energy, Frequency, TimeLag;
   elem_cav *cav;
 
-  Elem = init_elem(ElemData, Elem, true);
+  Elem = (struct elem_type*)malloc(sizeof(struct elem_type));
   if (Elem) {
     Elem          = (struct elem_type*)malloc(sizeof(struct elem_type));
     Elem->cav_ptr = (struct elem_cav*)malloc(sizeof(struct elem_cav));
@@ -238,6 +271,7 @@ struct elem_type* init_cav(const PyObject *ElemData, struct elem_type *Elem)
 
     Length    = atGetDouble(ElemData, (char*)"Length");
     check_error();
+
     Voltage   = atGetDouble(ElemData, (char*)"Voltage");
     check_error();
     Energy    = atGetDouble(ElemData, (char*)"Energy");
@@ -248,6 +282,7 @@ struct elem_type* init_cav(const PyObject *ElemData, struct elem_type *Elem)
     check_error();
 
     Elem->Length   = Length;
+
     cav->Voltage   = Voltage;
     cav->Energy    = Energy;
     cav->Frequency = Frequency;
@@ -263,13 +298,16 @@ struct elem_type* init_wig(const PyObject *ElemData, struct elem_type *Elem)
   int
     i, Nstep, Nmeth, NHharm, NVharm;
   double
-    *tmppr, kw, *By, *Bx, Lw, Bmax, Energy;
+    Length, *tmppr, kw, *By, *Bx, Lw, Bmax, Energy;
   elem_wig *wig;
 
-  Elem = init_elem(ElemData, Elem, true);
+  Elem = (struct elem_type*)malloc(sizeof(struct elem_type));
   if (Elem) {
     Elem->wig_ptr = (struct elem_wig*)malloc(sizeof(struct elem_wig));
     wig           = Elem->wig_ptr;
+
+    Length = atGetDouble(ElemData,      (char*)"Length");
+    check_error();
 
     Nmeth  = atGetLong(ElemData,        (char*)"Nmeth");
     check_error();
@@ -290,6 +328,8 @@ struct elem_type* init_wig(const PyObject *ElemData, struct elem_type *Elem)
     check_error();
     Bx     = atGetDoubleArray(ElemData, (char*)"Bx");
     check_error();
+
+    Elem->Length = Length;
 
     wig->Pmethod = Nmeth;
     wig->PN      = Nstep;
@@ -364,7 +404,7 @@ struct elem_type* init_M66(const PyObject *ElemData, struct elem_type *Elem)
 {
   double *M66;
 
-  Elem = init_elem(ElemData, Elem, false);
+  Elem = init_elem(ElemData, Elem, false, false);
   if (Elem) {
     Elem->M66_ptr = (struct elem_M66*)malloc(sizeof(struct elem_M66));
 
@@ -382,7 +422,7 @@ struct elem_type* init_corr(const PyObject *ElemData, struct elem_type *Elem)
 {
   double Length, *KickAngle;
 
-  Elem = init_elem(ElemData, Elem, true);
+  Elem = (struct elem_type*)malloc(sizeof(struct elem_type));
   if (Elem) {
     Elem->corr_ptr = (struct elem_corr*)malloc(sizeof(struct elem_corr));
 
@@ -405,7 +445,7 @@ struct elem_type* init_H(const PyObject *ElemData, struct elem_type *Elem)
   double  *polynom_a, *polynom_b, phi, gK;
   elem_H  *H;
 
-  Elem = init_elem(ElemData, Elem, true);
+  Elem = init_elem(ElemData, Elem, true, false);
   if (Elem) {
     Elem->H_ptr = (struct elem_H*)malloc(sizeof(struct elem_H));
     H           = Elem->H_ptr;
@@ -667,65 +707,65 @@ void cav_pass(double ps[], const double L, const double V_RFoE0,
 
 //------------------------------------------------------------------------------
 
-static void edge_fringe_entrance(double* r, double inv_rho, double edge_angle,
+static void edge_fringe_entrance(double ps[], double inv_rho, double edge_angle,
 				 double fint, double gap, int method)
-{ edge_fringe(r, inv_rho, edge_angle, fint, gap, method, true); }
+{ edge_fringe(ps, inv_rho, edge_angle, fint, gap, method, true); }
 
-static void edge_fringe_exit(double* r, double inv_rho, double edge_angle,
+static void edge_fringe_exit(double ps[], double inv_rho, double edge_angle,
 			     double fint, double gap, int method)
-{ edge_fringe(r, inv_rho, edge_angle, fint, gap, method, false); }
+{ edge_fringe(ps, inv_rho, edge_angle, fint, gap, method, false); }
 
 
-static void QuadFringePassP(double* r, const double b2)
+static void QuadFringePassP(double ps[], const double b2)
 {
-  /* x=r[0],px=r[1],y=r[2],py=r[3],delta=r[4],ct=r[5]
+  /* x=ps[0],px=ps[1],y=ps[2],py=ps[3],delta=ps[4],ct=ps[5]
      Lee-Whiting's thin lens limit formula as given in p. 390 of "Beam
      Dynamics..."by E. Forest                                                 */
-  double u     = b2/(12.0*(1.0+r[4]));
-  double x2    = r[0]*r[0];
-  double z2    = r[2]*r[2];
-  double xz    = r[0]*r[2];
-  double gx    = u * (x2+3*z2) * r[0];
-  double gz    = u * (z2+3*x2) * r[2];
+  double u     = b2/(12.0*(1.0+ps[4]));
+  double x2    = ps[0]*ps[0];
+  double z2    = ps[2]*ps[2];
+  double xz    = ps[0]*ps[2];
+  double gx    = u * (x2+3*z2) * ps[0];
+  double gz    = u * (z2+3*x2) * ps[2];
   double r1tmp = 0;
   double r3tmp = 0;
 
-  r[0] += gx;
-  r1tmp = 3*u*(2*xz*r[3]-(x2+z2)*r[1]);
+  ps[0] += gx;
+  r1tmp = 3*u*(2*xz*ps[3]-(x2+z2)*ps[1]);
    
-  r[2] -= gz;
+  ps[2] -= gz;
    
-  r3tmp = 3*u*(2*xz*r[1]-(x2+z2)*r[3]);
-  r[5] -= (gz*r[3] - gx*r[1])/(1+r[4]);
+  r3tmp = 3*u*(2*xz*ps[1]-(x2+z2)*ps[3]);
+  ps[5] -= (gz*ps[3] - gx*ps[1])/(1+ps[4]);
    
-  r[1] += r1tmp;
-  r[3] -= r3tmp;
+  ps[1] += r1tmp;
+  ps[3] -= r3tmp;
 }
 
-static void QuadFringePassN(double* r, const double b2)
+static void QuadFringePassN(double ps[], const double b2)
 {
-  /* x=r[0],px=r[1],y=r[2],py=r[3],delta=r[4],ct=r[5] 
+  /* x=ps[0],px=ps[1],y=ps[2],py=ps[3],delta=ps[4],ct=ps[5] 
      Lee-Whiting's thin lens limit formula as given in p. 390 of "Beam
      Dynamics..."by E. Forest                                                 */
-  double u     = b2/(12.0*(1.0+r[4]));
-  double x2    = r[0]*r[0];
-  double z2    = r[2]*r[2];
-  double xz    = r[0]*r[2];
-  double gx    = u * (x2+3*z2) * r[0];
-  double gz    = u * (z2+3*x2) * r[2];
+  double u     = b2/(12.0*(1.0+ps[4]));
+  double x2    = ps[0]*ps[0];
+  double z2    = ps[2]*ps[2];
+  double xz    = ps[0]*ps[2];
+  double gx    = u * (x2+3*z2) * ps[0];
+  double gz    = u * (z2+3*x2) * ps[2];
   double r1tmp = 0;
   double r3tmp = 0;
 
-  r[0] -= gx;
-  r1tmp = 3*u*(2*xz*r[3]-(x2+z2)*r[1]);
+  ps[0] -= gx;
+  r1tmp = 3*u*(2*xz*ps[3]-(x2+z2)*ps[1]);
    
-  r[2] += gz;
+  ps[2] += gz;
    
-  r3tmp = 3*u*(2*xz*r[1]-(x2+z2)*r[3]);
-  r[5] += (gz*r[3] - gx*r[1])/(1+r[4]);
+  r3tmp = 3*u*(2*xz*ps[1]-(x2+z2)*ps[3]);
+  ps[5] += (gz*ps[3] - gx*ps[1])/(1+ps[4]);
    
-  r[1] -= r1tmp;
-  r[3] += r3tmp;
+  ps[1] -= r1tmp;
+  ps[3] += r3tmp;
 }
 
 /* from elegant code */
@@ -828,6 +868,155 @@ static void linearQuadFringeElegantExit
   r6[1] = R[1][0]*r6[0] + R[1][1]*r6[1];
   r6[2] = R[2][2]*r6[2] + R[2][3]*r6[3];
   r6[3] = R[3][2]*r6[2] + R[3][3]*r6[3];
+}
+
+//------------------------------------------------------------------------------
+
+void E1rotation(double ps[],double X0ref, double E1)
+/* At Entrance Edge:
+   move particles to the field edge and convert coordinates to x, dx/dz, y,
+   dy/dz, then convert to x, px, y, py as integration is done with px, py     */
+{
+  double x0, dxdz0, dydz0, psi, fac;
+
+  dxdz0 = ps[1]/sqrt(SQR(1+ps[4])-SQR(ps[1])-SQR(ps[3]));
+  dydz0 = ps[3]/sqrt(SQR(1+ps[4])-SQR(ps[1])-SQR(ps[3]));
+  x0 = ps[0];
+
+  psi = atan(dxdz0);
+  ps[0] = ps[0]*cos(psi)/cos(E1+psi)+X0ref;
+  ps[1] = tan(E1+psi);
+  ps[3] = dydz0/(cos(E1)-dxdz0*sin(E1));
+  ps[2] += x0*sin(E1)*ps[3];
+  ps[5] += x0*tan(E1)/(1-dxdz0*tan(E1))*sqrt(1+SQR(dxdz0)+SQR(dydz0));
+  /* convert to px, py */
+  fac = sqrt(1+SQR(ps[1])+SQR(ps[3]));
+  ps[1] = ps[1]*(1+ps[4])/fac;
+  ps[3] = ps[3]*(1+ps[4])/fac;
+}
+
+void E2rotation(double ps[], double X0ref, double E2)
+/* At Exit Edge:
+   move particles to arc edge and convert coordinates to x, px, y, py         */
+{
+  double x0, dxdz0, dydz0, psi, fac;
+
+  dxdz0 = ps[1]/sqrt(SQR(1+ps[4])-SQR(ps[1])-SQR(ps[3]));
+  dydz0 = ps[3]/sqrt(SQR(1+ps[4])-SQR(ps[1])-SQR(ps[3]));
+  x0 = ps[0];
+
+  psi = atan(dxdz0);
+  fac = sqrt(1+SQR(dxdz0)+SQR(dydz0));
+  ps[0] = (ps[0]-X0ref)*cos(psi)/cos(E2+psi);
+  ps[1] = tan(E2+psi);
+  ps[3] = dydz0/(cos(E2)-dxdz0*sin(E2));
+  ps[2] += ps[3]*(x0-X0ref)*sin(E2);
+  ps[5] += (x0-X0ref)*tan(E2)/(1-dxdz0*tan(E2))*fac;
+  /* convert to px, py */
+  fac = sqrt(1+SQR(ps[1])+SQR(ps[3]));
+  ps[1] = ps[1]*(1+ps[4])/fac;
+  ps[3] = ps[3]*(1+ps[4])/fac;
+}
+
+void edgey(double ps[], double inv_rho, double edge_angle)
+/* Edge focusing in dipoles with hard-edge field for vertical only */
+{
+  double psi = inv_rho*tan(edge_angle);
+
+  /*ps[1]+=ps[0]*psi;*/
+  ps[3]-=ps[2]*psi;
+}
+
+void edgey_fringe(double ps[], double inv_rho, double edge_angle, double fint,
+		  double gap)
+/* Edge focusing in dipoles with fringe field, for vertical only */
+{
+  double
+    fx = inv_rho*tan(edge_angle),
+    psi_bar =
+    edge_angle-inv_rho*gap*fint*(1+sin(edge_angle)*sin(edge_angle))
+    /cos(edge_angle)/(1+ps[4]),
+    fy = inv_rho*tan(psi_bar);
+
+  /*ps[1]+=ps[0]*fx;*/
+  ps[3]-=ps[2]*fy;
+}
+
+void ladrift6(double ps[], double L)
+/* large angle drift, X. Huang, 7/31/2018
+   Input parameter L is the physical length
+   1/(1+delta) normalization is done internally
+   Hamiltonian H = (1+\delta)-sqrt{(1+\delta)^2-p_x^2-p_y^2}, change sign for
+   $\Delta z$ in AT                                                           */
+{
+  double
+    p_norm = 1./sqrt(SQR(1+ps[4])-SQR(ps[1])-SQR(ps[3])),
+    NormL = L*p_norm;
+
+  ps[0]+= NormL*ps[1];
+  ps[2]+= NormL*ps[3];
+  ps[5]+= L*(p_norm*(1+ps[4])-1.);
+}
+
+void bndstrthinkick(double ps[], double* A, double* B, double L, double irho,
+		    int max_order)
+/*****************************************************************************
+  Calculate multipole kick in a straight bending magnet, This is not the usual
+  Bends!
+  created by X. Huang, 7/31/2018
+  The reference coordinate system  is straight in s.
+  The B vector does not contain b0, we assume b0=irho
+
+  Note: in the US convention the transverse multipole field is written as:
+
+                         max_order+1
+                           ----
+                           \                       n-1
+	   (B + iB  )/ B rho  =  >   (ia  + b ) (x + iy)
+         y    x            /       n    n
+	                       ----
+                          n=1
+	is a polynomial in (x,y) with the highest order = MaxOrder
+
+
+	Using different index notation
+
+                         max_order
+                           ----
+                           \                       n
+	   (B + iB  )/ B rho  =  >   (iA  + B ) (x + iy)
+         y    x            /       n    n
+	                       ----
+                          n=0
+
+	A,B: i=0 ... max_order
+   [0] - dipole, [1] - quadrupole, [2] - sextupole ...
+   units for A,B[i] = 1/[m]^(i+1)
+	Coeficients are stroed in the PolynomA, PolynomB field of the element
+	structure in MATLAB
+
+	A[i] (C++,C) =  PolynomA(i+1) (MATLAB)
+	B[i] (C++,C) =  PolynomB(i+1) (MATLAB)
+	i = 0 .. MaxOrder
+******************************************************************************/
+{
+  int    i;
+  double
+    ReSum = B[max_order],
+    ImSum = A[max_order],
+    ReSumTemp;
+
+  /* recursively calculate the local transvrese magnetic field
+     Bx = ReSum, By = ImSum */
+  B[0] = irho;
+  for(i = max_order-1; i >= 0; i--) {
+    ReSumTemp = ReSum*ps[0] - ImSum*ps[2] + B[i];
+    ImSum = ImSum*ps[0] +  ReSum*ps[2] + A[i];
+    ReSum = ReSumTemp;
+  }
+  ps[1] -=  L*(ReSum);
+  ps[3] +=  L*ImSum;
+  ps[5] +=  0; /* pathlength */
 }
 
 //------------------------------------------------------------------------------
@@ -1136,6 +1325,103 @@ void HamPass(double ps[], const int num_particles,
       /* misalignment at exit */
       if (Elem->R2) ATmultmv(ps_vect, Elem->R2);
       if (Elem->T2) ATaddvv(ps_vect, Elem->T2);
+    }
+  }
+}
+
+void CBendPass(double ps[], const int num_particles, elem_type *Elem)
+{
+  int    k, m;
+  double *ps_vect, SL, L1, L2, K1, K2;
+  bool   useT1, useT2, useR1, useR2, useFringe1, useFringe2;
+
+  SL = Elem->Length/Elem->mpole_ptr->NumIntSteps;
+  L1 = SL*DRIFT1;
+  L2 = SL*DRIFT2;
+  K1 = SL*KICK1;
+  K2 = SL*KICK2;
+
+  /* mexPrintf("E0ref=%f\n",X0ref); */
+  if(Elem->T1 == NULL)
+    useT1 = false;
+  else
+    useT1 = true;
+  if(Elem->T2 == NULL)
+    useT2 = false;
+  else
+    useT2 = true;
+  if(Elem->R1 == NULL)
+    useR1 = false;
+  else
+    useR1 = true;
+  if(Elem->R2 == NULL)
+    useR2 = false;
+  else
+    useR2 = true;
+  /* if either is 0 - do not calculate fringe effects */
+  if(Elem->mpole_ptr->FringeInt1 == 0 || Elem->mpole_ptr->FullGap == 0)
+    useFringe1 = false;
+  else
+    useFringe1 = true;
+  if(Elem->mpole_ptr->FringeInt2 == 0 || Elem->mpole_ptr->FullGap == 0)
+    useFringe2 = false;
+  else
+    useFringe2 = true;
+
+  for(k = 0; k < num_particles; k++)	{   /* Loop over particles  */
+    ps_vect = ps+k*PS_DIM;
+    if(!atIsNaN(ps_vect[0])) {
+      /*  misalignment at entrance  */
+      if(useT1)	ATaddvv(ps_vect, Elem->T1);
+      if(useR1)	ATmultmv(ps_vect, Elem->R1);
+      /* edge focus */
+      if(useFringe1)
+	edgey_fringe(ps_vect,
+		     Elem->mpole_ptr->irho+Elem->mpole_ptr->PolynomB[1]
+		     *Elem->mpole_ptr->X0ref, Elem->mpole_ptr->EntranceAngle,
+		     Elem->mpole_ptr->FringeInt1, Elem->mpole_ptr->FullGap);
+      else
+	edgey(ps_vect,
+	      Elem->mpole_ptr->irho
+	      +Elem->mpole_ptr->PolynomB[1]*Elem->mpole_ptr->X0ref,
+	      Elem->mpole_ptr->EntranceAngle);
+      /* Rotate and translate to straight Cartesian coordinate */
+      E1rotation(ps_vect, Elem->mpole_ptr->X0ref,
+		 Elem->mpole_ptr->EntranceAngle);
+      /* integrator */
+      for(m = 0; m < Elem->mpole_ptr->NumIntSteps; m++) {
+	/* Loop over slices */
+	ps_vect = ps+k*PS_DIM;
+	ladrift6(ps_vect, L1);
+	bndstrthinkick(ps_vect, Elem->mpole_ptr->PolynomA,
+		       Elem->mpole_ptr->PolynomB, K1, Elem->mpole_ptr->irho,
+		       Elem->mpole_ptr->MaxOrder);
+	ladrift6(ps_vect, L2);
+	bndstrthinkick(ps_vect, Elem->mpole_ptr->PolynomA,
+		       Elem->mpole_ptr->PolynomB, K2, Elem->mpole_ptr->irho,
+		       Elem->mpole_ptr->MaxOrder);
+	ladrift6(ps_vect, L2);
+	bndstrthinkick(ps_vect, Elem->mpole_ptr->PolynomA,
+		       Elem->mpole_ptr->PolynomB, K1, Elem->mpole_ptr->irho,
+		       Elem->mpole_ptr->MaxOrder);
+	ladrift6(ps_vect, L1);
+      }
+      /* Rotate and translate back to curvilinear coordinate */
+      E2rotation(ps_vect, Elem->mpole_ptr->X0ref, Elem->mpole_ptr->ExitAngle);
+      ps_vect[5] -= Elem->mpole_ptr->RefDZ;
+      if(useFringe2)
+	edgey_fringe(ps_vect, Elem->mpole_ptr->irho
+		     +Elem->mpole_ptr->PolynomB[1]*Elem->mpole_ptr->X0ref,
+		     Elem->mpole_ptr->ExitAngle, Elem->mpole_ptr->FringeInt2,
+		     Elem->mpole_ptr->FullGap);
+      else    /* edge focus */
+	edgey(ps_vect,
+	      Elem->mpole_ptr->irho
+	      +Elem->mpole_ptr->PolynomB[1]*Elem->mpole_ptr->X0ref,
+	      Elem->mpole_ptr->ExitAngle);
+      /* Misalignment at exit */
+      if(useR2)	ATmultmv(ps_vect, Elem->R2);
+      if(useT2)	ATaddvv(ps_vect, Elem->T2);
     }
   }
 }

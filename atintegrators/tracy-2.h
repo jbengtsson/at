@@ -4,7 +4,7 @@
 #define TWOPI  6.28318530717959
 #define C0     2.99792458e8
 
-
+#define SQR(X)  ((X)*(X))
 #define sqr(x)  ((x)*(x))
 #define cube(x) ((x)*(x)*(x))
 
@@ -96,12 +96,15 @@ struct elem_mpole {
     FringeInt1,
     FringeInt2,
     FullGap,
-    // General multipole.
-    *PolynomA,
-    *PolynomB,
+    *PolynomA,          // General multipole.
+    *PolynomB,          //        ''
     *fringeIntM0,
     *fringeIntP0,
-    *KickAngle;
+    *KickAngle,
+    X0ref,              // Cartesian bend.
+    ByError,            //      ''
+    RefDZ;              //      ''
+
 };
 
 struct elem_cav {
