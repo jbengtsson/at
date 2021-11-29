@@ -166,6 +166,9 @@ struct elem_corr {
   double *KickAngle;
 };
 
+
+#define FMAX 32
+
 struct elem_H {
   int
     Type,            /* type is defined in track.h:
@@ -179,7 +182,8 @@ struct elem_H {
   double
     *PolynomA,
     *PolynomB,
-    Phi,             /* required for bend */
+    F[FMAX],         // Temporary storage.
+    BendingAngle,    /* required for bend */
     gK;              /* g * K, required for bend */
 };
 

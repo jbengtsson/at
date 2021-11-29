@@ -76,13 +76,6 @@ struct elem_type* init_elem(const PyObject *ElemData, struct elem_type *Elem,
   T2 = atGetOptionalDoubleArray(ElemData, (char*)"T2");
   check_error();
 
-  if (aper) {
-    EApertures = atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
-    check_error();
-    RApertures = atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
-    check_error();
-  }
-
   Elem->Length     = Length;
   Elem->R1         = R1;
   Elem->R2         = R2;
@@ -90,6 +83,11 @@ struct elem_type* init_elem(const PyObject *ElemData, struct elem_type *Elem,
   Elem->T2         = T2;
 
   if (aper) {
+    EApertures = atGetOptionalDoubleArray(ElemData, (char*)"EApertures");
+    check_error();
+    RApertures = atGetOptionalDoubleArray(ElemData, (char*)"RApertures");
+    check_error();
+
     Elem->EApertures = EApertures;
     Elem->RApertures = RApertures;
   }
@@ -485,7 +483,7 @@ struct elem_type* init_H(const PyObject *ElemData, struct elem_type *Elem)
 
     H->PolynomA        = polynom_a;
     H->PolynomB        = polynom_b;
-    H->Phi             = phi;
+    H->BendingAngle    = phi;
     H->gK              = gK;
 
     return Elem;
@@ -1340,11 +1338,15 @@ void WigRadPass(double ps[], const int num_particles, struct elem_type *Elem)
   }
 }
 
-void HamPass(double ps[], const int num_particles,
-	     const struct elem_type *Elem)
+void HamPass(double ps[], const int num_particles, const struct elem_type *Elem)
 {
   int    k;
   double *ps_vect;
+
+  for(k = 0; k < Elem->H_ptr->MaxOrder; k++) {
+    Elem->H_ptr->F[2*k]   = Elem->H_ptr->PolynomB[k];
+    Elem->H_ptr->F[2*k+1] = Elem->H_ptr->PolynomA[k];
+  }
 
   for(k = 0; k < num_particles; k++) {
     ps_vect = ps+k*PS_DIM;

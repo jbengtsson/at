@@ -288,25 +288,52 @@ void bend_fringe(T * x, double irho, double gK)
      total horror from Mathematica. This could benefit from some mini-TPSA */
 
   dpx =
-    -((b0*(Power(px,2)*Power(pz,4)*(Power(py,2) - Power(pz,2)) - Power(pz,6)*(Power(py,2) + Power(pz,2)) + 
-	       b0*g*K*px*(Power(pz,2)*Power(Power(py,2) + Power(pz,2),2)*(2*Power(py,2) + 3*Power(pz,2)) + Power(px,4)*(3*Power(py,2)*Power(pz,2) + 2*Power(pz,4)) + 
-			  Power(px,2)*(3*Power(py,6) + 8*Power(py,4)*Power(pz,2) + 9*Power(py,2)*Power(pz,4) + 5*Power(pz,6))))*
-	   Power(Sec((b0*g*K*(Power(pz,4) + Power(px,2)*(Power(py,2) + 2*Power(pz,2))))/Power(pz,3) - ArcTan((px*pz)/(Power(py,2) + Power(pz,2)))),2))/
-	  (Power(pz,5)*(Power(py,4) + Power(px,2)*Power(pz,2) + 2*Power(py,2)*Power(pz,2) + Power(pz,4))));
-
+    -((b0*(Power(px,2)*Power(pz,4)
+	   *(Power(py,2) - Power(pz,2))
+	   - Power(pz,6)*(Power(py,2) + Power(pz,2)) + 
+	       b0*g*K*px*(Power(pz,2)*Power(Power(py,2) + Power(pz,2),2)
+			  *(2*Power(py,2) + 3*Power(pz,2))
+			  + Power(px,4)*(3*Power(py,2)*Power(pz,2)
+					 + 2*Power(pz,4)) + 
+			  Power(px,2)*(3*Power(py,6)
+				       + 8*Power(py,4)*Power(pz,2)
+				       + 9*Power(py,2)*Power(pz,4)
+				       + 5*Power(pz,6))))*
+	   Power(Sec((b0*g*K*(Power(pz,4)
+			      + Power(px,2)*(Power(py,2)
+					     + 2*Power(pz,2))))/Power(pz,3)
+		     - ArcTan((px*pz)/(Power(py,2) + Power(pz,2)))),2))/
+	  (Power(pz,5)*(Power(py,4) + Power(px,2)*Power(pz,2)
+			+ 2*Power(py,2)*Power(pz,2) + Power(pz,4))));
 
   dpy =
-    -((b0*py*(px*Power(pz,4)*(Power(py,2) + Power(pz,2)) + b0*g*K*(-(Power(pz,4)*Power(Power(py,2) + Power(pz,2),2)) + 
-								       Power(px,4)*(3*Power(py,2)*Power(pz,2) + 4*Power(pz,4)) + 
-								       Power(px,2)*(3*Power(py,6) + 10*Power(py,4)*Power(pz,2) + 11*Power(py,2)*Power(pz,4) + 3*Power(pz,6))))*
-	   Power(Sec((b0*g*K*(Power(pz,4) + Power(px,2)*(Power(py,2) + 2*Power(pz,2))))/Power(pz,3) - ArcTan((px*pz)/(Power(py,2) + Power(pz,2)))),2))/
-	  (Power(pz,5)*(Power(py,4) + Power(px,2)*Power(pz,2) + 2*Power(py,2)*Power(pz,2) + Power(pz,4))));
+    -((b0*py*(px*Power(pz,4)*(Power(py,2) + Power(pz,2))
+	      + b0*g*K*(-(Power(pz,4)*Power(Power(py,2) + Power(pz,2),2))
+			+ Power(px,4)*(3*Power(py,2)*Power(pz,2)
+				       + 4*Power(pz,4))
+			+ Power(px,2)*(3*Power(py,6)
+				       + 10*Power(py,4)*Power(pz,2)
+				       + 11*Power(py,2)*Power(pz,4)
+				       + 3*Power(pz,6))))*
+	   Power(Sec((b0*g*K*(Power(pz,4) + Power(px,2)
+			      *(Power(py,2) + 2*Power(pz,2))))/Power(pz,3)
+		     - ArcTan((px*pz)/(Power(py,2) + Power(pz,2)))),2))/
+	  (Power(pz,5)*(Power(py,4) + Power(px,2)*Power(pz,2)
+			+ 2*Power(py,2)*Power(pz,2) + Power(pz,4))));
          
-  dd = (b0*(1 + d)*(px*Power(pz,4)*(Power(py,2) - Power(pz,2)) + b0*g*K*
-		    (-(Power(pz,4)*Power(Power(py,2) + Power(pz,2),2)) + Power(px,4)*(3*Power(py,2)*Power(pz,2) + 2*Power(pz,4)) + 
-		     Power(px,2)*(3*Power(py,6) + 8*Power(py,4)*Power(pz,2) + 7*Power(py,2)*Power(pz,4) + Power(pz,6))))*
-	Power(Sec((b0*g*K*(Power(pz,4) + Power(px,2)*(Power(py,2) + 2*Power(pz,2))))/Power(pz,3) - ArcTan((px*pz)/(Power(py,2) + Power(pz,2)))),2))/
-    (Power(pz,5)*(Power(py,4) + Power(px,2)*Power(pz,2) + 2*Power(py,2)*Power(pz,2) + Power(pz,4)));
+  dd =
+    (b0*(1 + d)*(px*Power(pz,4)*(Power(py,2) - Power(pz,2)) + b0*g*K*
+		    (-(Power(pz,4)*Power(Power(py,2) + Power(pz,2),2))
+		     + Power(px,4)*(3*Power(py,2)*Power(pz,2) + 2*Power(pz,4))
+		     + Power(px,2)*(3*Power(py,6) + 8*Power(py,4)*Power(pz,2)
+				    + 7*Power(py,2)*Power(pz,4)
+				    + Power(pz,6))))
+     *Power(Sec((b0*g*K*(Power(pz,4)
+			 + Power(px,2)*(Power(py,2)
+					+ 2*Power(pz,2))))/Power(pz,3)
+		- ArcTan((px*pz)/(Power(py,2) + Power(pz,2)))),2))/
+    (Power(pz,5)*(Power(py,4) + Power(px,2)*Power(pz,2)
+		  + 2*Power(py,2)*Power(pz,2) + Power(pz,4)));
 
   /* solve quadratic equation in yf (Forest fringe_part_I.pdf) */
 
@@ -319,17 +346,16 @@ void bend_fringe(T * x, double irho, double gK)
   x[x_]  = xf;
   x[py_] = pyf;
   x[ct_] = lf;
-    
 }
 
 template <typename T>
 void bend(const elem_type *Elem, T *x, double L, double phi, double gK,
 	  double *F, int nF, int slices)
 {
-  double irho = phi / L;
+  double irho = Elem->H_ptr->BendingAngle / L;
   /* convert arc length to rectangular length */
-  double LR = 2 / irho * sin(phi / 2.0);
-  Yrot(phi / 2, x);
+  double LR = 2 / irho * sin(Elem->H_ptr->BendingAngle / 2.0);
+  Yrot(Elem->H_ptr->BendingAngle / 2, x);
   bend_fringe(x, Elem->H_ptr->PolynomB[0], Elem->H_ptr->gK);
   if(Elem->H_ptr->MultipoleFringe) {
     multipole_fringe(Elem, x, LR, Elem->H_ptr->PolynomB, Elem->H_ptr->MaxOrder,
@@ -341,7 +367,7 @@ void bend(const elem_type *Elem, T *x, double L, double phi, double gK,
 		     1);
   }
   bend_fringe(x, -Elem->H_ptr->PolynomB[0], Elem->H_ptr->gK);
-  Yrot(phi / 2, x);
+  Yrot(Elem->H_ptr->BendingAngle / 2, x);
 }
 
 template<typename T>
@@ -356,11 +382,10 @@ void track_element(T *x, const elem_type *Elem)
       x[ct_] -= Elem->Length;
       break;
     case dipole:
-      Log(("bend %f %f %f\n", Elem->Length, Elem->H_ptr->Phi,
+      Log(("bend %f %f %f\n", Elem->Length, Elem->H_ptr->BendingAngle,
 	   creal(Elem->F[0])));
-      bend(Elem, x, Elem->Length, Elem->H_ptr->Phi, Elem->H_ptr->gK,
-	   Elem->H_ptr->PolynomB, Elem->H_ptr->MaxOrder,
-	   Elem->H_ptr->NumIntSteps);
+      bend(Elem, x, Elem->Length, Elem->H_ptr->BendingAngle, Elem->H_ptr->gK,
+	   Elem->H_ptr->F, Elem->H_ptr->MaxOrder, Elem->H_ptr->NumIntSteps);
       x[ct_] -= Elem->Length;
       break;
     case multipole:
