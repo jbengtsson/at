@@ -40,7 +40,7 @@
    print "double d[] = {% .17f, % .17f, % .17f, % .17f};" % (d1, d2, d3, d4)  */
 
 double
-  c[] =
+c[] =
   { 0.67560359597982889, -0.17560359597982883, -0.17560359597982883,
     0.67560359597982889},
   d[] =
@@ -49,24 +49,24 @@ double
 
 
 template<typename T>
-void multipole_fringe(const elem_type *Elem, T *x, double L, double *F, int nF,
-		      int edge)
+void mpole_fringe(T *x, const int type, const double LR, const double *F,
+		  const int nF, const int edge)
 {
-  // PTC multipole_fringer
+  // PTC mpole_fringer
   // Forest 13.29
   // not re-derived and checked
   // note this is the sum over n of Forest 13.29
   // one for each multipole component
     
-  T I, U, V, DU, DV, DUX, DVX, DUY, DVY, 
+  T
+    I, U, V, DU, DV, DUX, DVX, DUY, DVY, 
     FX, FY, FX_X, FX_Y, FY_X, FY_Y, 
     RX, IX, DRX, DIX;
     
-  if(edge == 0) {
+  if (edge == 0)
     I = 1;
-  } else {
+  else
     I = -1;
-  }
     
   FX   = 0;
   FY   = 0;
@@ -81,21 +81,19 @@ void multipole_fringe(const elem_type *Elem, T *x, double L, double *F, int nF,
   // invariant is (j is the index, i is the complex unit)
   // RX+IXi = (x + iy)^j
   for(int n = 0; n < nF; n++) {
-        
-    double B = F[2 * n];
-    double A = F[2 * n + 1];
-        
     int j = n + 1;
-        
+    double
+      B = F[2*n],
+      A = F[2*n+1];
+
     DRX = RX;
     DIX = IX;
 
     // complex muls
-
     RX = DRX * x[x_] - DIX * x[y_];
     IX = DRX * x[y_] + DIX * x[x_];
         
-    if(j == 1 && Elem->H_ptr->Type == dipole) {
+    if(j == 1 && type == dipole) {
       U  =         - A * IX;
       V  =         + A * RX;
       DU =         - A * DIX;
@@ -167,6 +165,7 @@ template <typename T>
 void Yrot(double phi, T * x)
 {
   T c, s;
+
   c = cos(phi);
   s = sin(phi);
   T x1[6] = {x[0], x[1], x[2], x[3], x[4], x[5]};
@@ -185,6 +184,7 @@ template<typename T>
 void exact_drift(T * x, double L)
 {
   T u = L / get_pz(x);
+
   x[x_] += x[px_] * u;
   x[y_] += x[py_] * u;
   x[ct_] += u * (1.0 + x[delta_]);
@@ -199,51 +199,39 @@ void exact_drift(T * x, double L)
 */
 
 template<typename T>
-void fr4(T * x, double L, double * F, int nF, int slices)
+void fr4(T *x, const double L, const double *F, const int nF, const int slices)
 {
-  double ds = L / slices;
-  int    max_order = nF - 1;
-  int    s, n, i;
+  int    max_order = nF - 1, s, n, i;
+  double ds        = L / slices;
 
-  for(s = 0; s < slices; s++)
-    {
-      for(n = 0; n < INT_ORDER; n++)
-        {
-	  exact_drift(x, c[n] * ds);
+  for(s = 0; s < slices; s++) {
+    for(n = 0; n < INT_ORDER; n++) {
+      exact_drift(x, c[n] * ds);
             
-	  /* multipole summation with horner's rule
-               
-	     scaled field = sum_n (b_n+ia_n) (x+iy)^n
-            
-	  */
+      /* multipole summation with horner's rule
+	 scaled field = sum_n (b_n+ia_n) (x+iy)^n                             */
 
-	  /* 
-	     C99 complex numbers don't work in C++
-	     forget the C++ complex class 
-	     complex double f = F[max_order];
-	     complex double z = x[x_] + x[y_] * I;
-	  */
+      /* C99 complex numbers don't work in C++
+	 forget the C++ complex class 
+	 complex double f = F[max_order];
+	 complex double z = x[x_] + x[y_] * I;                                */
             
-	  T fr = F[2 * max_order];
-	  T fi = F[2 * max_order + 1];
+      T fr = F[2*max_order];
+      T fi = F[2*max_order+1];
             
-	  for(i = max_order - 1; i >= 0; i--)
-            {
-	      /*
-		complex multiplication
-		f = f * z + F[i];
-	      */
-	      T temp1 = fr * x[x_] - fi * x[y_];
-	      T temp2 = fr * x[y_] + fi * x[x_];
-	      fr = temp1 + F[2 * i];
-	      fi = temp2 + F[2 * i + 1];
-            }
+      for(i = max_order - 1; i >= 0; i--) {
+	/* complex multiplication
+	   f = f * z + F[i];                                                */
+	T temp1 = fr * x[x_] - fi * x[y_];
+	T temp2 = fr * x[y_] + fi * x[x_];
+	fr = temp1 + F[2*i];
+	fi = temp2 + F[2*i+1];
+      }
 
-	  x[px_] -= d[n] * ds *  fr;
-	  x[py_] -= d[n] * ds * -fi;
-
-        }
+      x[px_] -= d[n] * ds *  fr;
+      x[py_] -= d[n] * ds * -fi;
     }
+  }
 
 }
 
@@ -255,15 +243,11 @@ void fr4(T * x, double L, double * F, int nF, int slices)
 #define Power pow
 
 template <typename T>
-T Sec(T x)
-{
-  return 1.0 / cos(x);
-}
+T Sec(T x) { return 1.0 / cos(x); }
 
 template<typename T>
-void bend_fringe(T * x, double irho, double gK)
+void bend_fringe(T *x, double irho, double gK)
 {
-
   T dpx, dpy, dd, b0, px, py, pz, g, K, d, phi, xp, yp, yf, xf, lf, pyf;
     
   b0 = irho;
@@ -291,20 +275,20 @@ void bend_fringe(T * x, double irho, double gK)
     -((b0*(Power(px,2)*Power(pz,4)
 	   *(Power(py,2) - Power(pz,2))
 	   - Power(pz,6)*(Power(py,2) + Power(pz,2)) + 
-	       b0*g*K*px*(Power(pz,2)*Power(Power(py,2) + Power(pz,2),2)
-			  *(2*Power(py,2) + 3*Power(pz,2))
-			  + Power(px,4)*(3*Power(py,2)*Power(pz,2)
-					 + 2*Power(pz,4)) + 
-			  Power(px,2)*(3*Power(py,6)
-				       + 8*Power(py,4)*Power(pz,2)
-				       + 9*Power(py,2)*Power(pz,4)
-				       + 5*Power(pz,6))))*
-	   Power(Sec((b0*g*K*(Power(pz,4)
-			      + Power(px,2)*(Power(py,2)
-					     + 2*Power(pz,2))))/Power(pz,3)
-		     - ArcTan((px*pz)/(Power(py,2) + Power(pz,2)))),2))/
-	  (Power(pz,5)*(Power(py,4) + Power(px,2)*Power(pz,2)
-			+ 2*Power(py,2)*Power(pz,2) + Power(pz,4))));
+	   b0*g*K*px*(Power(pz,2)*Power(Power(py,2) + Power(pz,2),2)
+		      *(2*Power(py,2) + 3*Power(pz,2))
+		      + Power(px,4)*(3*Power(py,2)*Power(pz,2)
+				     + 2*Power(pz,4)) + 
+		      Power(px,2)*(3*Power(py,6)
+				   + 8*Power(py,4)*Power(pz,2)
+				   + 9*Power(py,2)*Power(pz,4)
+				   + 5*Power(pz,6))))*
+       Power(Sec((b0*g*K*(Power(pz,4)
+			  + Power(px,2)*(Power(py,2)
+					 + 2*Power(pz,2))))/Power(pz,3)
+		 - ArcTan((px*pz)/(Power(py,2) + Power(pz,2)))),2))/
+      (Power(pz,5)*(Power(py,4) + Power(px,2)*Power(pz,2)
+		    + 2*Power(py,2)*Power(pz,2) + Power(pz,4))));
 
   dpy =
     -((b0*py*(px*Power(pz,4)*(Power(py,2) + Power(pz,2))
@@ -315,19 +299,19 @@ void bend_fringe(T * x, double irho, double gK)
 				       + 10*Power(py,4)*Power(pz,2)
 				       + 11*Power(py,2)*Power(pz,4)
 				       + 3*Power(pz,6))))*
-	   Power(Sec((b0*g*K*(Power(pz,4) + Power(px,2)
-			      *(Power(py,2) + 2*Power(pz,2))))/Power(pz,3)
-		     - ArcTan((px*pz)/(Power(py,2) + Power(pz,2)))),2))/
-	  (Power(pz,5)*(Power(py,4) + Power(px,2)*Power(pz,2)
-			+ 2*Power(py,2)*Power(pz,2) + Power(pz,4))));
+       Power(Sec((b0*g*K*(Power(pz,4) + Power(px,2)
+			  *(Power(py,2) + 2*Power(pz,2))))/Power(pz,3)
+		 - ArcTan((px*pz)/(Power(py,2) + Power(pz,2)))),2))/
+      (Power(pz,5)*(Power(py,4) + Power(px,2)*Power(pz,2)
+		    + 2*Power(py,2)*Power(pz,2) + Power(pz,4))));
          
   dd =
     (b0*(1 + d)*(px*Power(pz,4)*(Power(py,2) - Power(pz,2)) + b0*g*K*
-		    (-(Power(pz,4)*Power(Power(py,2) + Power(pz,2),2))
-		     + Power(px,4)*(3*Power(py,2)*Power(pz,2) + 2*Power(pz,4))
-		     + Power(px,2)*(3*Power(py,6) + 8*Power(py,4)*Power(pz,2)
-				    + 7*Power(py,2)*Power(pz,4)
-				    + Power(pz,6))))
+		 (-(Power(pz,4)*Power(Power(py,2) + Power(pz,2),2))
+		  + Power(px,4)*(3*Power(py,2)*Power(pz,2) + 2*Power(pz,4))
+		  + Power(px,2)*(3*Power(py,6) + 8*Power(py,4)*Power(pz,2)
+				 + 7*Power(py,2)*Power(pz,4)
+				 + Power(pz,6))))
      *Power(Sec((b0*g*K*(Power(pz,4)
 			 + Power(px,2)*(Power(py,2)
 					+ 2*Power(pz,2))))/Power(pz,3)
@@ -349,66 +333,59 @@ void bend_fringe(T * x, double irho, double gK)
 }
 
 template <typename T>
-void bend(const elem_type *Elem, T *x, double L, double phi, double gK,
-	  double *F, int nF, int slices)
+void bend(T *x, const int type, const double L, const double phi,
+	  const double gK, const double *F, const int nF, const int slices,
+	  const bool mp_fringe)
 {
-  double irho = Elem->H_ptr->BendingAngle / L;
-  /* convert arc length to rectangular length */
-  double LR = 2 / irho * sin(Elem->H_ptr->BendingAngle / 2.0);
-  Yrot(Elem->H_ptr->BendingAngle / 2, x);
-  bend_fringe(x, Elem->H_ptr->PolynomB[0], Elem->H_ptr->gK);
-  if(Elem->H_ptr->MultipoleFringe) {
-    multipole_fringe(Elem, x, LR, Elem->H_ptr->PolynomB, Elem->H_ptr->MaxOrder,
-		     0);
-  }
+  double
+    irho = phi/L,
+    /* convert arc length to rectangular length */
+    LR = 2e0/irho*sin(phi/2e0);
+
+  Yrot(phi/2e0, x);
+  bend_fringe(x, F[0], gK);
+  if(mp_fringe) mpole_fringe(x, type, LR, F, nF, 0);
   fr4(x, LR, F, nF, slices);
-  if(Elem->H_ptr->MultipoleFringe) {
-    multipole_fringe(Elem, x, LR, Elem->H_ptr->PolynomB, Elem->H_ptr->MaxOrder,
-		     1);
-  }
-  bend_fringe(x, -Elem->H_ptr->PolynomB[0], Elem->H_ptr->gK);
-  Yrot(Elem->H_ptr->BendingAngle / 2, x);
+  if(mp_fringe) mpole_fringe(x, type, LR, F, nF, 1);
+  bend_fringe(x, -F[0], gK);
+  Yrot(phi/2e0, x);
 }
 
 template<typename T>
 void track_element(T *x, const elem_type *Elem)
 {
+  const elem_H *H = Elem->H_ptr;
+
   Log(("track element\n"));
-  switch(Elem->H_ptr->Type)
-    {
-    case drift:
-      Log(("drift %f\n", Elem->Length));
-      exact_drift(x, Elem->Length);
-      x[ct_] -= Elem->Length;
-      break;
-    case dipole:
-      Log(("bend %f %f %f\n", Elem->Length, Elem->H_ptr->BendingAngle,
-	   creal(Elem->F[0])));
-      bend(Elem, x, Elem->Length, Elem->H_ptr->BendingAngle, Elem->H_ptr->gK,
-	   Elem->H_ptr->F, Elem->H_ptr->MaxOrder, Elem->H_ptr->NumIntSteps);
-      x[ct_] -= Elem->Length;
-      break;
-    case multipole:
-      Log(("multipole %f %f\n", Elem->Length, creal(Elem->H_ptr->PolynomB[1])));
-      if(Elem->H_ptr->MultipoleFringe) {
-	multipole_fringe(Elem, x, Elem->Length, Elem->H_ptr->PolynomB,
-			 Elem->H_ptr->MaxOrder, 0);
-      }
-      fr4(x, Elem->Length, Elem->H_ptr->PolynomB, Elem->H_ptr->MaxOrder,
-	  Elem->H_ptr->NumIntSteps);
-      if(Elem->H_ptr->MultipoleFringe) {
-	multipole_fringe(Elem, x, Elem->Length, Elem->H_ptr->PolynomB,
-			 Elem->H_ptr->MaxOrder, 1);
-      }
-      x[ct_] -= Elem->Length;
-      break;
-    case marker:
-      Log(("marker\n"));
-      break;
-    default:
-      Log(("unknown element\n"));
-      exit(1);
-    }
+  switch(H->Type) {
+  case drift:
+    Log(("drift %f\n", Elem->Length));
+    exact_drift(x, Elem->Length);
+    x[ct_] -= Elem->Length;
+    break;
+  case dipole:
+    Log(("bend %f %f %f\n", Elem->Length, H->BendingAngle,
+	 creal(Elem->F[0])));
+    bend(x, H->Type, Elem->Length, H->BendingAngle, H->gK, H->F, H->MaxOrder,
+	 H->NumIntSteps, H->MultipoleFringe);
+    x[ct_] -= Elem->Length;
+    break;
+  case multipole:
+    Log(("multipole %f %f\n", Elem->Length, creal(H->PolynomB[1])));
+    if(H->MultipoleFringe)
+      mpole_fringe(x, H->Type, Elem->Length, H->F, H->MaxOrder, 0);
+    fr4(x, Elem->Length, H->F, H->MaxOrder, H->NumIntSteps);
+    if(H->MultipoleFringe)
+      mpole_fringe(x, H->Type, Elem->Length, H->F, H->MaxOrder, 1);
+    x[ct_] -= Elem->Length;
+    break;
+  case marker:
+    Log(("marker\n"));
+    break;
+  default:
+    Log(("unknown element\n"));
+    exit(1);
+  }
 }
 
 #if 0
