@@ -34,6 +34,7 @@ static const double
   PI        = 3.141592653589793238462643383279502884197e0,
   epsilon_o = 8.854187817e-12; /* Vacuum permittivity */
 
+#define CGAMMA 8.846056192e-05 /* [m]/[GeV^3] Ref[1] (4.1) */
 
 double C_u, C_gamma, C_q, cl_rad, q_fluct;
 
@@ -88,6 +89,7 @@ struct elem_mpole {
     FringeQuadEntrance,
     FringeQuadExit;
   double
+    Energy,
     irho,               // 1/rho; non zero for dipoles.
     // Dipole.
     BendingAngle,       // [rad].

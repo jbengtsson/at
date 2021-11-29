@@ -133,8 +133,9 @@ struct elem_type* init_drift(const PyObject *ElemData, struct elem_type *Elem)
     return NULL;
 }
 
-struct elem_type* init_mpole(const PyObject *ElemData, struct elem_type *Elem,
-			     const bool bend, const bool cbend)
+struct elem_type*
+init_mpole(const PyObject *ElemData, struct elem_type *Elem, const bool bend,
+	   const bool cbend, const bool incl_E0)
 {
   int
     MaxOrder, NumIntSteps,  FringeBendEntrance, FringeBendExit,
@@ -142,7 +143,7 @@ struct elem_type* init_mpole(const PyObject *ElemData, struct elem_type *Elem,
   double
     BendingAngle, EntranceAngle, ExitAngle, FullGap, FringeInt1, FringeInt2,
     *PolynomA, *PolynomB, *fringeIntM0, *fringeIntP0, *KickAngle, X0ref,
-    ByError, RefDZ;
+    ByError, RefDZ, Energy;
   elem_mpole
     *mpole;
 
@@ -150,6 +151,11 @@ struct elem_type* init_mpole(const PyObject *ElemData, struct elem_type *Elem,
   if (Elem) {
     Elem->mpole_ptr = (struct elem_mpole*)malloc(sizeof(struct elem_mpole));
     mpole           = Elem->mpole_ptr;
+
+    if (incl_E0) {
+      Energy = atGetDouble(ElemData,                 (char*)"Energy");
+      check_error();
+    }
 
     PolynomA = atGetDoubleArray(ElemData,            (char*)"PolynomA");
     check_error();
@@ -208,10 +214,13 @@ struct elem_type* init_mpole(const PyObject *ElemData, struct elem_type *Elem,
     KickAngle = atGetOptionalDoubleArray(ElemData,   (char*)"KickAngle");
     check_error();
         
-    mpole->PolynomA    = PolynomA;
-    mpole->PolynomB    = PolynomB;
-    mpole->MaxOrder    = MaxOrder;
-    mpole->NumIntSteps = NumIntSteps;
+    if (incl_E0)
+      mpole->Energy             = Energy;
+
+    mpole->PolynomA             = PolynomA;
+    mpole->PolynomB             = PolynomB;
+    mpole->MaxOrder             = MaxOrder;
+    mpole->NumIntSteps          = NumIntSteps;
 
     if (bend) {
       mpole->BendingAngle       = BendingAngle;
@@ -1029,6 +1038,80 @@ void bndstrthinkick(double ps[], double* A, double* B, double L, double irho,
 
 //------------------------------------------------------------------------------
 
+double StrB2perp(double bx, double by, double x, double xpr, double y,
+		 double ypr)
+/* Calculates sqr(|B x e|) , where e is a unit vector in the direction of
+   velocity                                                                   */
+
+{
+  double v_norm2;
+
+  v_norm2 = 1/(1 + SQR(xpr) + SQR(ypr));
+
+  /* components of the normalized velocity vector
+     double ex, ey, ez;
+     ex = xpr; 
+     ey = ypr; 
+     ez = 1;
+  */
+  	
+  return((SQR(by) + SQR(bx) + SQR(bx*ypr - by*xpr) )*v_norm2) ;
+} 
+
+static void strthinkickrad(double ps[], const double A[], const double B[],
+			   const double L, const double E0, const int max_order)
+/*****************************************************************************
+ Calculate and apply a multipole kick to a 6-dimentional
+ phase space vector in a straight element ( quadrupole)
+ 
+ IMPORTANT !!!
+ he reference coordinate system is straight but the field expansion may still
+ ontain dipole terms: PolynomA(1), PolynomB(1) - in MATLAB notation,
+ [0], B[0] - C,C++ notation
+ 
+******************************************************************************/
+{
+  int
+    i;
+  double
+    ReSum = B[max_order],
+    ImSum = A[max_order],
+    ReSumTemp,
+    irho = 0, /*straight elements no curvature.*/
+    x, xpr, y, ypr, p_norm,dp_0, B2P,
+    CRAD = CGAMMA*E0*E0*E0/(TWOPI*1e27);	/* [m]/[GeV^3] M.Sands (4.1) */
+   
+  for (i = max_order-1; i >= 0; i--) {
+    ReSumTemp = ReSum*ps[0] - ImSum*ps[2] + B[i];
+    ImSum = ImSum*ps[0] +  ReSum*ps[2] + A[i];
+    ReSum = ReSumTemp;
+  }
+   
+  /* calculate angles from momentums 	*/
+  p_norm = 1/(1+ps[4]);
+  x   = ps[0];
+  xpr = ps[1]*p_norm;
+  y   = ps[2];
+  ypr = ps[3]*p_norm;
+   
+  /*B2P = B2perp(ImSum, ReSum +irho, irho, x , xpr, y ,ypr);*/
+  B2P = StrB2perp(ImSum, ReSum , x , xpr, y ,ypr);
+   
+  dp_0 = ps[4];
+  ps[4] = ps[4] - CRAD*SQR(1+ps[4])*B2P*(1 + x*irho + (SQR(xpr)+SQR(ypr))/2 )*L;
+   
+  /* recalculate momentums from angles after losing energy for radiation */
+  p_norm = 1/(1+ps[4]);
+  ps[1] = xpr/p_norm;
+  ps[3] = ypr/p_norm;
+   
+  ps[1] -=  L*(ReSum-(dp_0-ps[0]*irho)*irho);
+  ps[3] +=  L*ImSum;
+  ps[5] +=  L*irho*ps[0]; /* pathlength */
+}
+
+//------------------------------------------------------------------------------
+
 void IdentityPass(double ps[], const int num_particles,
 		  const struct elem_type *Elem)
 {
@@ -1208,6 +1291,93 @@ void MpolePass(double ps[], const int num_particles,
   if (mpole->KickAngle) {
     /* Remove corrector component in polynomial coefficients */
     mpole->PolynomB[0] += sin(mpole->KickAngle[0])/Elem->Length;
+    mpole->PolynomA[0] -= sin(mpole->KickAngle[1])/Elem->Length;
+  }
+}
+
+void MpoleRadPass(double ps[], const int num_particles,
+		  const struct elem_type *Elem)
+{
+  int    k, m;
+  double *ps_vect;
+  double SL, L1, L2, K1, K2;
+
+  const elem_mpole *mpole = Elem->mpole_ptr;
+
+  const bool
+    useLinFrEleEntrance =
+    (mpole->fringeIntM0 != NULL && mpole->fringeIntP0 != NULL
+     && mpole->FringeQuadEntrance == 2),
+    useLinFrEleExit =
+    (mpole->fringeIntM0 != NULL && mpole->fringeIntP0 != NULL
+     && mpole->FringeQuadExit == 2);
+
+  SL = Elem->Length/mpole->NumIntSteps;
+  L1 = SL*DRIFT1;
+  L2 = SL*DRIFT2;
+  K1 = SL*KICK1;
+  K2 = SL*KICK2;
+    
+  if (mpole->KickAngle) {
+    /* Convert corrector component to polynomial coefficients */
+    mpole->PolynomB[0] -= sin(mpole->KickAngle[0])/Elem->Length;
+    mpole->PolynomA[0] += sin(mpole->KickAngle[1])/Elem->Length;
+  }
+
+#pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD)   \
+  default(shared) shared(r, num_particles) private(c, ps_vect, m)
+
+  for (k = 0; k < num_particles; k++) { /* Loop over particles  */
+    ps_vect = ps+k*PS_DIM;
+    if(!atIsNaN(ps_vect[0])) {
+      /*  misalignment at entrance  */
+      if (Elem->T1) ATaddvv(ps_vect, Elem->T1);
+      if (Elem->R1) ATmultmv(ps_vect, Elem->R1);
+      /* Check physical apertures at the entrance of the magnet */
+      if (Elem->RApertures)
+	checkiflostRectangularAp(ps_vect, Elem->RApertures);
+      if (Elem->EApertures)
+	checkiflostEllipticalAp(ps_vect, Elem->EApertures);
+      if (mpole->FringeQuadEntrance && mpole->PolynomB[1] != 0e0) {
+	if (useLinFrEleEntrance) /*Linear fringe fields from elegant*/
+	  linearQuadFringeElegantEntrance
+	    (ps_vect, mpole->PolynomB[1], mpole->fringeIntM0,
+	     mpole->fringeIntP0);
+	else
+	  QuadFringePassP(ps_vect, mpole->PolynomB[1]);
+      }
+      /* integrator */
+      for (m = 0; m < mpole->NumIntSteps; m++) { /* Loop over slices */
+	ps_vect = ps+k*PS_DIM;
+	ATdrift6(ps_vect, L1);
+	strthinkickrad(ps_vect, mpole->PolynomA, mpole->PolynomB, K1,
+		       mpole->Energy, mpole->MaxOrder);
+	ATdrift6(ps_vect, L2);
+	strthinkickrad(ps_vect, mpole->PolynomA, mpole->PolynomB, K2,
+		       mpole->Energy, mpole->MaxOrder);
+	ATdrift6(ps_vect, L2);
+	strthinkickrad(ps_vect, mpole->PolynomA, mpole->PolynomB, K1,
+		       mpole->Energy, mpole->MaxOrder);
+	ATdrift6(ps_vect,L1);
+      }
+      if (mpole->FringeQuadExit && mpole->PolynomB[1]!=0) {
+	if (useLinFrEleExit) /*Linear fringe fields from elegant*/
+	  linearQuadFringeElegantExit(ps_vect, mpole->PolynomB[1],
+				      mpole->fringeIntM0, mpole->fringeIntP0);
+	else
+	  QuadFringePassN(ps_vect, mpole->PolynomB[1]);
+      }
+      /* Check physical apertures at the exit of the magnet */
+      if (Elem->RApertures) checkiflostRectangularAp(ps_vect, Elem->RApertures);
+      if (Elem->EApertures) checkiflostEllipticalAp(ps_vect, Elem->EApertures);
+      /* Misalignment at exit */
+      if (Elem->R2) ATmultmv(ps_vect, Elem->R2);
+      if (Elem->T2) ATaddvv(ps_vect, Elem->T2); 
+    }
+  }
+  if (mpole->KickAngle) {
+    /* Remove corrector component in polynomial coefficients */
+    mpole->PolynomB[0] += sin(mpole->KickAngle[0])/Elem->Length; 
     mpole->PolynomA[0] -= sin(mpole->KickAngle[1])/Elem->Length;
   }
 }
