@@ -121,7 +121,12 @@ struct elem_wig {
     PN,             /* Number of integration steps */
     Nw,             /* Number of periods */
     NHharm,         /* No. of horizontal harmonics */
-    NVharm;         /* No. of vertical harmonics */
+    NVharm,         /* No. of vertical harmonics */
+
+    // For radiation calculations.
+    HSplitPole,
+    VSplitPole;
+
   double
     E0,             /* Energy of ring, [GeV] */
     PB0,            /* B0 in [Tesla] */
@@ -140,7 +145,17 @@ struct elem_wig {
     Vkx[WHmax],
     Vky[WHmax],
     Vkz[WHmax],
-    Vtz[WHmax];
+    Vtz[WHmax],
+
+    // For radiation calculations.
+    zStartH,
+    zStartV,  /* Start and end z coordinates of the wiggler field, which
+		 are computed                                                 */
+    zEndH,
+    zEndV,    /* based on the phase of the first harmonic to get matched
+		 dispersion.                                                  */
+    srCoef,
+    Po;       /* beta*gamma for reference particle */
 };
 
 struct elem_M66 {

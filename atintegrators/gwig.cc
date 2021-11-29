@@ -29,8 +29,13 @@
 
 void GWigGauge(struct elem_wig *pWig, double *X, int flag);
 void GWigPass_2nd(struct elem_type *Elem, double X[]);
+void GWigRadPass_2nd(struct elem_type *Elem, double X[]);
 void GWigPass_4th(struct elem_type *Elem, double X[]);
+void GWigRadPass_4th(struct elem_type *Elem, double X[]);
 void GWigMap_2nd(struct elem_wig *pWig, double *X, double dl);
+void GWigRadiationKicks(struct elem_wig *pWig, double *X, double *Bxyz,
+			double dl);
+void GWigB(struct elem_wig *pWig, double *Xvec, double *B);
 void GWigAx(struct elem_wig *pWig, double *Xvec, double *pax, double *paxpy);
 void GWigAy(struct elem_wig *pWig, double *Xvec, double *pay, double *paypx);
 double sinc(double x );
@@ -56,7 +61,7 @@ void GWigGauge(struct elem_wig *pWig, double *X, int flag)
   }
 }
 
-void GWigPass_2nd(const struct elem_type *Elem, double X[]) 
+void GWigPass_2nd(struct elem_type *Elem, double X[]) 
 {
   int      i, Nstep;
   double   dl;
@@ -70,7 +75,37 @@ void GWigPass_2nd(const struct elem_type *Elem, double X[])
   }
 }
 
-void GWigPass_4th(const struct elem_type *Elem, double X[])
+void GWigRadPass_2nd(struct elem_type *Elem, double *X) 
+{
+  int      i, Nstep;
+  double   dl, B[2], ax, ay, axpy, aypx;
+  elem_wig *pWig = Elem->wig_ptr;
+  
+  Nstep = pWig->PN*(pWig->Nw);
+  dl    = pWig->Lw/(pWig->PN);
+  
+  GWigAx(pWig, X, &ax, &axpy);
+  GWigAy(pWig, X, &ay, &aypx);
+  GWigB(pWig, X, B);
+  X[1] -= ax;
+  X[3] -= ay;
+  GWigRadiationKicks(pWig, X, B, dl);
+  X[1] += ax;
+  X[3] += ay;	 
+  for (i = 1; i <= Nstep; i++) {
+    GWigMap_2nd(pWig, X, dl);
+    GWigAx(pWig, X, &ax, &axpy);
+    GWigAy(pWig, X, &ay, &aypx);
+    GWigB(pWig, X, B);
+    X[1] -= ax;
+    X[3] -= ay;
+    GWigRadiationKicks(pWig, X, B, dl);
+    X[1] += ax;
+    X[3] += ay;
+  }
+}
+
+void GWigPass_4th(struct elem_type *Elem, double X[])
 {
   int      i, Nstep;
   double   dl, dl1, dl0;
@@ -90,6 +125,46 @@ void GWigPass_4th(const struct elem_type *Elem, double X[])
     GWigMap_2nd(pWig, X, dl1);
     GWigMap_2nd(pWig, X, dl0);
     GWigMap_2nd(pWig, X, dl1);
+  }
+}
+
+void GWigRadPass_4th(struct elem_type *Elem, double *X)
+{
+
+  int      i, Nstep;
+  double   dl, dl1, dl0, B[2], ax, ay, axpy, aypx;	
+  elem_wig *pWig = Elem->wig_ptr;
+
+  const double
+    x1 = 1.3512071919596576340476878089715e0,
+    x0 =-1.7024143839193152680953756179429e0;
+
+  Nstep = pWig->PN*(pWig->Nw);
+  dl = pWig->Lw/(pWig->PN);
+
+  dl1 = x1*dl;
+  dl0 = x0*dl;
+
+  GWigAx(pWig, X, &ax, &axpy);
+  GWigAy(pWig, X, &ay, &aypx);
+  GWigB(pWig, X, B);
+  X[1] -= ax;
+  X[3] -= ay;
+  GWigRadiationKicks(pWig, X, B, dl);
+  X[1] += ax;
+  X[3] += ay;
+  for (i = 1; i <= Nstep; i++ ) {
+    GWigMap_2nd(pWig, X, dl1);
+    GWigMap_2nd(pWig, X, dl0);
+    GWigMap_2nd(pWig, X, dl1);
+    GWigAx(pWig, X, &ax, &axpy);
+    GWigAy(pWig, X, &ay, &aypx);
+    GWigB(pWig, X, B);
+    X[1] -= ax;
+    X[3] -= ay;
+    GWigRadiationKicks(pWig, X, B, dl);
+    X[1] += ax;
+    X[3] += ay;	
   }
 }
 
@@ -147,6 +222,145 @@ void GWigMap_2nd(struct elem_wig *pWig, double *X, double dl)
   /* Step5: increase a half step in z */
   pWig->Zw = pWig->Zw + dl2;
   
+}
+
+void GWigRadiationKicks(struct elem_wig *pWig, double *X, double *Bxy,
+			double dl)
+/* Apply kicks for synchrotron radiation.
+   Added by M. Borland, August 2007.                                          */
+{
+  double irho2, H, dFactor;
+  double B2;
+  double dDelta;
+
+  /* B^2 in T^2 */
+  B2 = (Bxy[0]*Bxy[0]) + (Bxy[1]*Bxy[1]);
+  if (B2==0)
+    return;
+  
+  /* Beam rigidity in T*m */
+  H = (pWig->Po)/586.679074042074490;
+
+  /* 1/rho^2 */
+  irho2 = B2/(H*H);
+
+  /* (1+delta)^2 */
+  dFactor = ((1+X[4])*(1+X[4]));
+  
+  /* Classical radiation loss */
+  dDelta = -(pWig->srCoef)*dFactor*irho2*dl;
+  X[4] += dDelta;
+  X[1] *= (1+dDelta);
+  X[3] *= (1+dDelta);
+ 
+}
+
+void GWigB(struct elem_wig *pWig, double *Xvec, double *B) 
+/* Compute magnetic field at particle location.
+ * Added by M. Borland, August 2007.
+ */
+{
+  int    i;
+  double x, y, z;
+  double kx, ky, kz, tz, kw;
+  double cx, sx, chx, shx;
+  double cy, sy, chy, shy;
+  double cz;
+  /* B0 is a reserved symbol on MacOS, defined in termios.h */
+  double _B0;
+  
+  x = Xvec[0];
+  y = Xvec[2];
+  z = pWig->Zw;
+  
+  kw   = 2e0*PI/(pWig->Lw);
+
+  B[0] = 0;
+  B[1] = 0;
+
+  if (pWig->NHharm && z>=pWig->zStartH && z<=pWig->zEndH) {
+    _B0 = pWig->PB0;
+    if (!pWig->HSplitPole) {
+      /* Normal Horizontal Wiggler: note that one potentially could have:
+	 kx=0                                                             */
+      for (i = 0; i < pWig->NHharm; i++) {
+        kx = pWig->Hkx[i];
+        ky = pWig->Hky[i];
+        kz = pWig->Hkz[i];
+        tz = pWig->Htz[i];
+
+        sx  = sin(kx*x);
+        cx  = cos(kx*x);
+        chy = cosh(ky * y);
+        shy = sinh(ky * y);
+        cz = cos(kz*z+tz);
+        
+        /* Accumulate field values in user-supplied array (Bx, By) */
+        B[0] += _B0*pWig->HCw_raw[i]*kx/ky*sx*shy*cz;
+        B[1] -= _B0*pWig->HCw_raw[i]*cx*chy*cz;
+      }
+    } else {
+      /* Split-pole Horizontal Wiggler: note that one potentially could have:
+	 ky=0 (caught in main routine)                                        */
+      for (i = 0; i < pWig->NHharm; i++) {
+        kx = pWig->Hkx[i];
+        ky = pWig->Hky[i];
+        kz = pWig->Hkz[i];
+        tz = pWig->Htz[i];
+
+        shx = sinh(kx*x);
+        chx = cosh(kx*x);
+        cy  = cos(ky * y);
+        sy  = sin(ky * y);
+        cz  = cos(kz*z+tz);
+        
+        B[0] -= _B0*pWig->HCw_raw[i]*kx/ky*shx*sy*cz;
+        B[1] -= _B0*pWig->HCw_raw[i]*chx*cy*cz;
+      }
+    }
+  }
+  
+  if (pWig->NVharm && z>=pWig->zStartV && z<=pWig->zEndV) {
+    _B0 = pWig->PB0;
+    if (!pWig->VSplitPole) {
+      /* Normal Vertical Wiggler: note that one potentially could have: ky=0 */
+      for (i = 0; i < pWig->NVharm; i++ ) {
+        kx = pWig->Vkx[i];
+        ky = pWig->Vky[i];
+        kz = pWig->Vkz[i];
+        tz = pWig->Vtz[i];
+
+        shx = sinh(kx * x);
+        chx = cosh(kx * x);
+        sy  = sin(ky * y);
+        cy  = cos(ky * y);
+        cz  = cos(kz*z + tz);
+
+        /* Accumulate field values in user-supplied array (Bx, By) */
+        B[0] += _B0*pWig->VCw_raw[i]*chx*cy*cz;
+        B[1] -= _B0*pWig->VCw_raw[i]*ky/kx*shx*sy*cz;
+      }
+    } else {
+      /* Split-pole Vertical Wiggler: note that one potentially could have:
+	 kx=0 (caught in main routine)                                        */
+      for (i = 0; i < pWig->NVharm; i++ ) {
+        kx = pWig->Vkx[i];
+        ky = pWig->Vky[i];
+        kz = pWig->Vkz[i];
+        tz = pWig->Vtz[i];
+
+        sx  = sin(kx * x);
+        cx  = cos(kx * x);
+        shy = sinh(ky * y);
+        chy = cosh(ky * y);
+        cz  = cos(kz*z + tz);
+
+        /* Accumulate field values in user-supplied array (Bx, By) */
+        B[0] += _B0*pWig->VCw_raw[i]*cx*chy*cz;
+        B[1] += _B0*pWig->VCw_raw[i]*ky/kx*sx*shy*cz;
+      }
+    }
+  }
 }
 
 void GWigAx(struct elem_wig *pWig, double *Xvec, double *pax, double *paxpy) 

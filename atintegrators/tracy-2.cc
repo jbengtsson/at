@@ -293,21 +293,20 @@ struct elem_type* init_cav(const PyObject *ElemData, struct elem_type *Elem)
     return NULL;
 }
 
-struct elem_type* init_wig(const PyObject *ElemData, struct elem_type *Elem)
+struct elem_type* init_wig(const PyObject *ElemData, struct elem_type *Elem,
+			   const bool rad)
 {
   int
     i, Nstep, Nmeth, NHharm, NVharm;
   double
-    Length, *tmppr, kw, *By, *Bx, Lw, Bmax, Energy;
-  elem_wig *wig;
+    *tmppr, kw, *By, *Bx, Lw, Bmax, Energy;
+  elem_wig
+    *wig;
 
-  Elem = (struct elem_type*)malloc(sizeof(struct elem_type));
+  Elem = init_elem(ElemData, Elem, true, false);
   if (Elem) {
     Elem->wig_ptr = (struct elem_wig*)malloc(sizeof(struct elem_wig));
     wig           = Elem->wig_ptr;
-
-    Length = atGetDouble(ElemData,      (char*)"Length");
-    check_error();
 
     Nmeth  = atGetLong(ElemData,        (char*)"Nmeth");
     check_error();
@@ -329,8 +328,6 @@ struct elem_type* init_wig(const PyObject *ElemData, struct elem_type *Elem)
     Bx     = atGetDoubleArray(ElemData, (char*)"Bx");
     check_error();
 
-    Elem->Length = Length;
-
     wig->Pmethod = Nmeth;
     wig->PN      = Nstep;
     wig->NHharm  = NHharm;
@@ -345,6 +342,19 @@ struct elem_type* init_wig(const PyObject *ElemData, struct elem_type *Elem)
     kw           = 2e0*PI/(wig->Lw);
     wig->Zw      = 0e0;
     wig->Aw      = 0e0;
+
+    if (rad) {
+      wig->Po = wig->E0/XMC2;
+      wig->srCoef =
+	(q_e*q_e)*((wig->Po)*(wig->Po)*(wig->Po))
+	/(6*PI*epsilon_o*m_e*(clight*clight));
+      wig->HSplitPole = 0;
+      wig->VSplitPole = 0;
+      wig->zStartH = 0e0;
+      wig->zEndH = Elem->Length;
+      wig->zStartV = 0e0;
+      wig->zEndV = Elem->Length;
+    }
 
     tmppr = By;
     for (i = 0; i < NHharm; i++) {
@@ -1282,8 +1292,7 @@ void CorrectorPass(double ps[], const int num_particles,
   }
 }
 
-void WigPass(double ps[], const int num_particles,
-	     const struct elem_type *Elem)
+void WigPass(double ps[], const int num_particles, struct elem_type *Elem)
 {
   int    k;
   double *ps_vec;
@@ -1297,6 +1306,30 @@ void WigPass(double ps[], const int num_particles,
 	break;
       case fourth:
 	GWigPass_4th(Elem, ps_vec);
+	break;
+      default:
+	printf("Invalid wiggler integration method %d.\n",
+	       Elem->wig_ptr->Pmethod);
+	break;
+      }
+    }
+  }
+}
+
+void WigRadPass(double ps[], const int num_particles, struct elem_type *Elem)
+{
+  int    k;
+  double *ps_vec;
+
+  for(k = 0; k < num_particles; k++) {
+    ps_vec = ps+k*PS_DIM;
+    if(!atIsNaN(ps_vec[0])) {
+      switch (Elem->wig_ptr->Pmethod) {
+      case second:
+	GWigRadPass_2nd(Elem, ps_vec);
+	break;
+      case fourth:
+	GWigRadPass_4th(Elem, ps_vec);
 	break;
       default:
 	printf("Invalid wiggler integration method %d.\n",

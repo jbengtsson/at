@@ -1,38 +1,11 @@
-/*
- *----------------------------------------------------------------------------
- * Modification Log:
- * -----------------
- * .04  2003-04-29      YK Wu, Duke University, wu@fel.duke.edu 
- *			using scientific notation for constants. 
- *                      Checked with TRACY pascal code.
- *                      Computing differential pathlength only.
- *
- * .03  2003-04-28      YK Wu, Duke University, wu@fel.duke.edu 
- *			Convert to C code and cross-checked with the pascal version;
- *
- * .02  2001-12-xx      Y. K. Wu, Duke University, wu@fel.duke.edu
- *                      Implementing DA version of the wiggler integrator for Pascal.
- *                      Gauge is disabled !!! (Dec. 4, 2001)
- *  
- * .01  2001-02-12      Y. K. Wu, LBNL
- *                      Implementing a generic wiggler integrator
- *                      for paraxial-ray Hamiltonian approximation.
- *
- *                    
- *----------------------------------------------------------------------------
- *  Accelerator Physics Group, Duke FEL Lab, www.fel.duke.edu  
- */
-
-#ifndef  GWIG
 #include "gwig.h"
 #include <stdlib.h>
 #include <math.h>
 #include <stdio.h>
-#endif
 
 void GWigGauge(struct gwigR *pWig, double *X, int flag);
-void GWigPass_2nd(struct gwigR *pWig, double *X);
-void GWigPass_4th(struct gwigR *pWig, double *X);
+void GWigRadPass_2nd(struct gwigR *pWig, double *X);
+void GWigRadPass_4th(struct gwigR *pWig, double *X);
 void GWigMap_2nd(struct gwigR *pWig, double *X, double dl);
 void GWigAx(struct gwigR *pWig, double *Xvec, double *pax, double *paxpy);
 void GWigAy(struct gwigR *pWig, double *Xvec, double *pay, double *paypx);
@@ -61,7 +34,7 @@ void GWigGauge(struct gwigR *pWig, double *X, int flag)
 }
 
 
-void GWigPass_2nd(struct gwigR *pWig, double *X) 
+void GWigRadPass_2nd(struct gwigR *pWig, double *X) 
 {
   int    i, Nstep;
   double dl;
@@ -71,14 +44,14 @@ void GWigPass_2nd(struct gwigR *pWig, double *X)
   Nstep = pWig->PN*(pWig->Nw);
   dl    = pWig->Lw/(pWig->PN);
   
-    GWigAx(pWig, X, &ax, &axpy);
-    GWigAy(pWig, X, &ay, &aypx);
-    GWigB(pWig, X, B);
-    X[1] -= ax;
-    X[3] -= ay;
-	GWigRadiationKicks(pWig, X, B, dl);
-    X[1] += ax;
-    X[3] += ay;	 
+  GWigAx(pWig, X, &ax, &axpy);
+  GWigAy(pWig, X, &ay, &aypx);
+  GWigB(pWig, X, B);
+  X[1] -= ax;
+  X[3] -= ay;
+  GWigRadiationKicks(pWig, X, B, dl);
+  X[1] += ax;
+  X[3] += ay;	 
   for (i = 1; i <= Nstep; i++) {
     GWigMap_2nd(pWig, X, dl);
     GWigAx(pWig, X, &ax, &axpy);
@@ -86,14 +59,14 @@ void GWigPass_2nd(struct gwigR *pWig, double *X)
     GWigB(pWig, X, B);
     X[1] -= ax;
     X[3] -= ay;
-	GWigRadiationKicks(pWig, X, B, dl);
-	X[1] += ax;
+    GWigRadiationKicks(pWig, X, B, dl);
+    X[1] += ax;
     X[3] += ay;
   }
 }
 
 
-void GWigPass_4th(struct gwigR *pWig, double *X)
+void GWigRadPass_4th(struct gwigR *pWig, double *X)
 {
 
   const double x1 = 1.3512071919596576340476878089715e0;
@@ -103,20 +76,20 @@ void GWigPass_4th(struct gwigR *pWig, double *X)
   double dl, dl1, dl0;
   double B[2];
   double ax, ay, axpy, aypx;	
-	Nstep = pWig->PN*(pWig->Nw);
-	dl = pWig->Lw/(pWig->PN);
+  Nstep = pWig->PN*(pWig->Nw);
+  dl = pWig->Lw/(pWig->PN);
 
-	dl1 = x1*dl;
-	dl0 = x0*dl;
+  dl1 = x1*dl;
+  dl0 = x0*dl;
 
-    GWigAx(pWig, X, &ax, &axpy);
-    GWigAy(pWig, X, &ay, &aypx);
-    GWigB(pWig, X, B);
-    X[1] -= ax;
-    X[3] -= ay;
-    GWigRadiationKicks(pWig, X, B, dl);
-    X[1] += ax;
-    X[3] += ay;
+  GWigAx(pWig, X, &ax, &axpy);
+  GWigAy(pWig, X, &ay, &aypx);
+  GWigB(pWig, X, B);
+  X[1] -= ax;
+  X[3] -= ay;
+  GWigRadiationKicks(pWig, X, B, dl);
+  X[1] += ax;
+  X[3] += ay;
   for (i = 1; i <= Nstep; i++ ) {
     GWigMap_2nd(pWig, X, dl1);
     GWigMap_2nd(pWig, X, dl0);
@@ -164,9 +137,9 @@ void GWigMap_2nd(struct gwigR *pWig, double *X, double dl)
   X[3] = X[3] - axpy;
 
   X[0] = X[0] + dld*X[1];
-/* Full path length
-  X[5] = X[5] + dl + 0.5e0*dld*(X[1]*X[1])/(1.0e0+X[4]);
-*/
+  /* Full path length
+     X[5] = X[5] + dl + 0.5e0*dld*(X[1]*X[1])/(1.0e0+X[4]);
+  */
   /* Differential path length only */
   X[5] = X[5] + 0.5e0*dld*(X[1]*X[1])/(1.0e0+X[4]);
    
@@ -322,7 +295,7 @@ void GWigAy(struct gwigR *pWig, double *Xvec, double *pay, double *paypx)
       syky = y * sinc(ky * y);
     }
     aypx = aypx + (pWig->VCw[i])*(kw/kz)* kx*shx*syky*sz;
-   }
+  }
   
   *pay = ay;
   *paypx = aypx;
@@ -332,7 +305,7 @@ void GWigAy(struct gwigR *pWig, double *Xvec, double *pay, double *paypx)
 double sinc(double x)
 {
   double x2, result;
-/* Expand sinc(x) = sin(x)/x to x^8 */
+  /* Expand sinc(x) = sin(x)/x to x^8 */
   x2 = x*x;
   result = 1e0 - x2/6e0*(1e0 - x2/20e0 *(1e0 - x2/42e0*(1e0-x2/72e0) ) );
   return result;
@@ -366,7 +339,8 @@ void GWigB(struct gwigR *pWig, double *Xvec, double *B)
   if (pWig->NHharm && z>=pWig->zStartH && z<=pWig->zEndH) {
     _B0 = pWig->PB0;
     if (!pWig->HSplitPole) {
-      /* Normal Horizontal Wiggler: note that one potentially could have: kx=0 */
+      /* Normal Horizontal Wiggler: note that one potentially could have:
+	 kx=0                                                             */
       for (i = 0; i < pWig->NHharm; i++) {
         kx = pWig->Hkx[i];
         ky = pWig->Hky[i];
@@ -384,7 +358,8 @@ void GWigB(struct gwigR *pWig, double *Xvec, double *B)
         B[1] -= _B0*pWig->HCw_raw[i]*cx*chy*cz;
       }
     } else {
-      /* Split-pole Horizontal Wiggler: note that one potentially could have: ky=0 (caught in main routine) */
+      /* Split-pole Horizontal Wiggler: note that one potentially could have:
+	 ky=0 (caught in main routine)                                        */
       for (i = 0; i < pWig->NHharm; i++) {
         kx = pWig->Hkx[i];
         ky = pWig->Hky[i];
@@ -424,7 +399,8 @@ void GWigB(struct gwigR *pWig, double *Xvec, double *B)
         B[1] -= _B0*pWig->VCw_raw[i]*ky/kx*shx*sy*cz;
       }
     } else {
-      /* Split-pole Vertical Wiggler: note that one potentially could have: kx=0 (caught in main routine) */
+      /* Split-pole Vertical Wiggler: note that one potentially could have:
+	 kx=0 (caught in main routine)                                        */
       for (i = 0; i < pWig->NVharm; i++ ) {
         kx = pWig->Vkx[i];
         ky = pWig->Vky[i];
@@ -458,7 +434,7 @@ void GWigRadiationKicks(struct gwigR *pWig, double *X, double *Bxy, double dl)
   /* B^2 in T^2 */
   B2 = (Bxy[0]*Bxy[0]) + (Bxy[1]*Bxy[1]);
   if (B2==0)
-	  return;
+    return;
   
   /* Beam rigidity in T*m */
   H = (pWig->Po)/586.679074042074490;
@@ -470,10 +446,10 @@ void GWigRadiationKicks(struct gwigR *pWig, double *X, double *Bxy, double dl)
   dFactor = ((1+X[4])*(1+X[4]));
   
   /* Classical radiation loss */
-    dDelta = -(pWig->srCoef)*dFactor*irho2*dl;
-    X[4] += dDelta;
-    X[1] *= (1+dDelta);
-    X[3] *= (1+dDelta);
+  dDelta = -(pWig->srCoef)*dFactor*irho2*dl;
+  X[4] += dDelta;
+  X[1] *= (1+dDelta);
+  X[3] *= (1+dDelta);
  
 }
 
