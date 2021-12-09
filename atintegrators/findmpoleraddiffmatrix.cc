@@ -74,109 +74,6 @@ static void edgefringeB(double* r, double *B, double inv_rho, double edge_angle,
 
 }
 
-static void thinkickrad(double* r, double* A, double* B, double L, double irho,
-			double E0, int max_order)
-
-/***************************************************************************** 
-Calculate and apply a multipole kick to a phase space vector *r in a multipole element.
-The reference coordinate system  may have the curvature given by the inverse 
-(design) radius irho. irho = 0 for straight elements
-
-IMPORTANT !!!
-The desighn magnetic field Byo that provides this curvature By0 = irho * E0 /(c*e)
-MUST NOT be included in the dipole term PolynomB(1)(MATLAB notation)(B[0] C notation) 
-of the By field expansion
-HOWEVER!!! to calculate the effect of classical radiation the full field must be 
-used in the square of the |v x B|.
-When calling B2perp(Bx, By, ...), use the By = ReSum + irho, where ReSum is the 
-normalized vertical field - sum of the polynomial terms in PolynomB.
-
-The kick is given by
-
-           e L      L delta      L x
-theta  = - --- B  + -------  -  -----  , 
-     x     p    y     rho           2
-            0                    rho
-
-         e L
-theta  = --- B
-     y    p   x
-           0
-
-Note: in the US convention the field is written as:
-
-                        max_order+1
-                          ----
-                          \                       n-1
-	   (B + iB  ) = B rho  >   (ia  + b ) (x + iy)
-        y    x           /       n    n
-	                      ----
-                          n=1
-
-Use different index notation 
-
-                         max_order
-                           ----
-                           \                       n
-	   (B + iB  )/ B rho  =  >   (iA  + B ) (x + iy)
-        y    x             /       n    n
-  	                        ----
-                           n=0
-
-A,B: i=0 ... i=max_order
-[0] - dipole, [1] - quadrupole, [2] - sextupole ...
-units for A,B[i] = 1/[m]^(i+1)
-Coeficients are stored in the PolynomA, PolynomB field of the element
-structure in MATLAB
-
-
-******************************************************************************/
-{
-  int i;
-  double ImSum = A[max_order];
-  double ReSum = B[max_order];	
-  double x ,xpr, y, ypr, p_norm,dp_0, B2P;
-  double ReSumTemp;
-  double CRAD = CGAMMA*E0*E0*E0/(TWOPI*1e27);
-  	
-  /* recursively calculate the local transvrese magnetic field
-     Bx = ReSum, By = ImSum
-  */
-  for(i=max_order-1;i>=0;i--)
-    {
-      ReSumTemp = ReSum*r[0] - ImSum*r[2] + B[i];
-      ImSum = ImSum*r[0] +  ReSum*r[2] + A[i];
-      ReSum = ReSumTemp;
-    }
-	
-
-  /* calculate angles from momentas */	
-  p_norm = 1/(1+r[4]);
-  x   = r[0];
-  xpr = r[1]*p_norm;
-  y   = r[2];
-  ypr = r[3]*p_norm;
-
-
-  B2P = B2perp(ImSum, ReSum +irho, irho, x , xpr, y ,ypr);
-	
-  dp_0 = r[4]; /* save a copy of the initial value of dp/p */
-
-  r[4] = r[4] - CRAD*SQR(1+r[4])*B2P*(1 + x*irho + (SQR(xpr)+SQR(ypr))/2 )*L;
-
-  /* recalculate momentums from angles after losing energy to radiation */
-  p_norm = 1/(1+r[4]);
-  r[1] = xpr/p_norm;
-  r[3] = ypr/p_norm;
-
-  	
-  r[1] -=  L*(ReSum-(dp_0-r[0]*irho)*irho);
-  r[3] +=  L*ImSum;
-  r[5] +=  L*irho*r[0]; /* pathlength */
-
-
-}
-
 static void thinkickM(double* orbit_in, double* A, double* B, double L,
 		      double irho, int max_order, double *M66)
 /* Calculate the symplectic (no radiation) transfer matrix of a 
@@ -245,7 +142,7 @@ static void thinkickB(double* orbit_in, double* A, double* B, double L,
   double BB,B2P,B3P;
   int    i;
   double p_norm = 1/(1+orbit_in[4]);
-  double p_norm2 = SQR(p_norm);
+  double p_norm2 = sqr(p_norm);
   double ImSum = A[max_order];
   double ReSum = B[max_order];	
   double ReSumTemp;
@@ -270,8 +167,8 @@ static void thinkickB(double* orbit_in, double* A, double* B, double L,
   B3P = B2P*sqrt(B2P);
 
   BB =
-    CU * CER * LAMBDABAR *  pow(E0/M0C2,5) * L * B3P * SQR(SQR(1+orbit_in[4]))*
-    (1+orbit_in[0]*irho + (SQR(orbit_in[1])+SQR(orbit_in[3]))*p_norm2/2);
+    CU * CER * LAMBDABAR *  pow(E0/M0C2,5) * L * B3P * sqr(sqr(1+orbit_in[4]))*
+    (1+orbit_in[0]*irho + (sqr(orbit_in[1])+sqr(orbit_in[3]))*p_norm2/2);
 
 	
   /* When a 6-by-6 matrix is represented in MATLAB as one-dimentional 
@@ -286,10 +183,10 @@ static void thinkickB(double* orbit_in, double* A, double* B, double L,
     B66[i] = 0;
 	
   /* Populate B66 */
-  B66[7]      = BB*SQR(orbit_in[1])*p_norm2;
+  B66[7]      = BB*sqr(orbit_in[1])*p_norm2;
   B66[19]     = BB*orbit_in[1]*orbit_in[3]*p_norm2;
   B66[9]      = B66[19];
-  B66[21]     = BB*SQR(orbit_in[3])*p_norm2;
+  B66[21]     = BB*sqr(orbit_in[3])*p_norm2;
   B66[10]     = BB*orbit_in[1]*p_norm;
   B66[25]     = B66[10];
   B66[22]     = BB*orbit_in[3]*p_norm;
@@ -319,12 +216,12 @@ static void drift_propagateB(double *orb_in, double L,  double *B)
 
   DRIFTMAT[6]  =  L/(1+orb_in[4]);
   DRIFTMAT[20] =  DRIFTMAT[6];
-  DRIFTMAT[24] = -L*orb_in[1]/SQR(1+orb_in[4]);
-  DRIFTMAT[26] = -L*orb_in[3]/SQR(1+orb_in[4]);
-  DRIFTMAT[11] =  L*orb_in[1]/SQR(1+orb_in[4]);
-  DRIFTMAT[23] =  L*orb_in[3]/SQR(1+orb_in[4]);	
+  DRIFTMAT[24] = -L*orb_in[1]/sqr(1+orb_in[4]);
+  DRIFTMAT[26] = -L*orb_in[3]/sqr(1+orb_in[4]);
+  DRIFTMAT[11] =  L*orb_in[1]/sqr(1+orb_in[4]);
+  DRIFTMAT[23] =  L*orb_in[3]/sqr(1+orb_in[4]);	
   DRIFTMAT[29] =
-    -L*(SQR(orb_in[1])+SQR(orb_in[3]))/((1+orb_in[4])*SQR(1+orb_in[4]));
+    -L*(sqr(orb_in[1])+sqr(orb_in[3]))/((1+orb_in[4])*sqr(1+orb_in[4]));
 
   ATsandwichmmt(DRIFTMAT,B);
 }
@@ -367,8 +264,8 @@ static void FindElemB(double *orbit_in, double le, double irho, double *A,
 	
   /* Transform orbit to a local coordinate system of an element
      BDIFF stays zero	*/
-  if (T1) ATaddvv(orbit_in,T1);	
-  if (R1) ATmultmv(orbit_in,R1);
+  if (T1) ATaddvv(orbit_in, T1);	
+  if (R1) ATmultmv(orbit_in, R1);
     
   /* Propagate orbit_in and BDIFF through the entrance edge */
   edgefringeB(orbit_in, BDIFF, irho, entrance_angle, fringe_int1, full_gap);
@@ -378,34 +275,34 @@ static void FindElemB(double *orbit_in, double le, double irho, double *A,
   for(m=0; m < num_int_steps; m++) /* Loop over slices	*/			
     {
       drift_propagateB(orbit_in,L1, BDIFF);
-      atdrift(orbit_in,L1);
+      Drift(orbit_in, L1, false);
 				
-      thinkickM(orbit_in, A,B, K1, irho, max_order, MKICK);
-      thinkickB(orbit_in, A,B, K1, irho, max_order, E0, BKICK);
-      ATsandwichmmt(MKICK,BDIFF);
-      ATaddmm(BKICK,BDIFF);
-      thinkickrad(orbit_in, A, B, K1, irho, E0, max_order);
+      thinkickM(orbit_in, A, B, K1, irho, max_order, MKICK);
+      thinkickB(orbit_in, A, B, K1, irho, max_order, E0, BKICK);
+      ATsandwichmmt(MKICK, BDIFF);
+      ATaddmm(BKICK, BDIFF);
+      thin_kick(orbit_in, A, B, K1, irho, max_order, E0, true);
 		
-      drift_propagateB(orbit_in,L2, BDIFF);
-      atdrift(orbit_in,L2);
+      drift_propagateB(orbit_in, L2, BDIFF);
+      Drift(orbit_in, L2, false);
 				
-      thinkickM(orbit_in, A,B, K2, irho, max_order, MKICK);
-      thinkickB(orbit_in, A,B, K2, irho, max_order, E0, BKICK);
-      ATsandwichmmt(MKICK,BDIFF);
-      ATaddmm(BKICK,BDIFF);
-      thinkickrad(orbit_in, A, B, K2, irho, E0, max_order);
+      thinkickM(orbit_in, A, B, K2, irho, max_order, MKICK);
+      thinkickB(orbit_in, A, B, K2, irho, max_order, E0, BKICK);
+      ATsandwichmmt(MKICK, BDIFF);
+      ATaddmm(BKICK, BDIFF);
+      thin_kick(orbit_in, A, B, K2, irho, max_order, E0, true);
 	
       drift_propagateB(orbit_in,L2, BDIFF);
-      atdrift(orbit_in,L2);
+      Drift(orbit_in, L2, false);
 				
-      thinkickM(orbit_in, A,B, K1, irho, max_order, MKICK);
-      thinkickB(orbit_in, A,B, K1, irho, max_order, E0, BKICK);
-      ATsandwichmmt(MKICK,BDIFF);
-      ATaddmm(BKICK,BDIFF);
-      thinkickrad(orbit_in, A, B,  K1, irho, E0, max_order);
+      thinkickM(orbit_in, A, B, K1, irho, max_order, MKICK);
+      thinkickB(orbit_in, A, B, K1, irho, max_order, E0, BKICK);
+      ATsandwichmmt(MKICK, BDIFF);
+      ATaddmm(BKICK, BDIFF);
+      thin_kick(orbit_in, A, B, K1, irho, max_order, E0, true);
 
-      drift_propagateB(orbit_in,L1, BDIFF);
-      atdrift(orbit_in,L1);
+      drift_propagateB(orbit_in, L1, BDIFF);
+      Drift(orbit_in, L1, false);
     }  
 		
   edgefringeB(orbit_in, BDIFF, irho, exit_angle, fringe_int2, full_gap);
