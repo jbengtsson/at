@@ -217,8 +217,8 @@ lat_names = {
     'bessy-iii' : lat_dir+'/BESSY-III/NoTG-TGRB-B60-6bend-6sx_JB_tracy.lat'
 }
 
-lat_name = 'dba'
-# lat_name = 'hmba'
+# lat_name = 'dba'
+lat_name = 'hmba'
 # lat_name = 'bessy-iii'
 if lat_name != 'bessy-iii':
     lat = at.load_mat(lat_names[lat_name])
@@ -227,9 +227,10 @@ else:
         at.load_tracy(lat_names[lat_name], harmonic_number=538,
                       lattice_key='cell')
 
-if False:
+if not False:
     for elem in lat:
         print(elem)
+    exit(0)
 
 lat.radiation_off()
 

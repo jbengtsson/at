@@ -1258,7 +1258,7 @@ void WigRadPass(double ps[], const int num_particles, struct elem_type *Elem)
 void HamPass(double ps[], const int num_particles, const struct elem_type *Elem)
 {
   int    k;
-  double *ps_vect;
+  double *ps_vec;
 
   for(k = 0; k < Elem->H_ptr->MaxOrder; k++) {
     Elem->H_ptr->F[2*k]   = Elem->H_ptr->PolynomB[k];
@@ -1266,83 +1266,22 @@ void HamPass(double ps[], const int num_particles, const struct elem_type *Elem)
   }
 
   for(k = 0; k < num_particles; k++) {
-    ps_vect = ps+k*PS_DIM;
-    if(!atIsNaN(ps_vect[0])) {
+    ps_vec = ps+k*PS_DIM;
+    if(!atIsNaN(ps_vec[0])) {
       /* misalignment at entrance */
-      if (Elem->T1) ATaddvv(ps_vect, Elem->T1);
-      if (Elem->R1) ATmultmv(ps_vect, Elem->R1);
+      if (Elem->T1) ATaddvv(ps_vec, Elem->T1);
+      if (Elem->R1) ATmultmv(ps_vec, Elem->R1);
 
-      track_element(ps_vect, Elem);
+      track_element(ps_vec, Elem);
 
       /* misalignment at exit */
-      if (Elem->R2) ATmultmv(ps_vect, Elem->R2);
-      if (Elem->T2) ATaddvv(ps_vect, Elem->T2);
+      if (Elem->R2) ATmultmv(ps_vec, Elem->R2);
+      if (Elem->T2) ATaddvv(ps_vec, Elem->T2);
     }
   }
 }
 
 //------------------------------------------------------------------------------
-
-void bndstrthinkick(double ps[], double* A, double* B, double L, double irho,
-		    int max_order)
-/*****************************************************************************
-  Calculate multipole kick in a straight bending magnet, This is not the usual
-  Bends!
-  created by X. Huang, 7/31/2018
-  The reference coordinate system  is straight in s.
-  The B vector does not contain b0, we assume b0=irho
-
-  Note: in the US convention the transverse multipole field is written as:
-
-                         max_order+1
-                           ----
-                           \                       n-1
-	   (B + iB  )/ B rho  =  >   (ia  + b ) (x + iy)
-         y    x            /       n    n
-	                       ----
-                          n=1
-	is a polynomial in (x,y) with the highest order = MaxOrder
-
-
-	Using different index notation
-
-                         max_order
-                           ----
-                           \                       n
-	   (B + iB  )/ B rho  =  >   (iA  + B ) (x + iy)
-         y    x            /       n    n
-	                       ----
-                          n=0
-
-	A,B: i=0 ... max_order
-   [0] - dipole, [1] - quadrupole, [2] - sextupole ...
-   units for A,B[i] = 1/[m]^(i+1)
-	Coeficients are stroed in the PolynomA, PolynomB field of the element
-	structure in MATLAB
-
-	A[i] (C++,C) =  PolynomA(i+1) (MATLAB)
-	B[i] (C++,C) =  PolynomB(i+1) (MATLAB)
-	i = 0 .. MaxOrder
-******************************************************************************/
-{
-  int    i;
-  double
-    ReSum = B[max_order],
-    ImSum = A[max_order],
-    ReSumTemp;
-
-  /* recursively calculate the local transvrese magnetic field
-     Bx = ReSum, By = ImSum */
-  B[0] = irho;
-  for(i = max_order-1; i >= 0; i--) {
-    ReSumTemp = ReSum*ps[0] - ImSum*ps[2] + B[i];
-    ImSum = ImSum*ps[0] +  ReSum*ps[2] + A[i];
-    ReSum = ReSumTemp;
-  }
-  ps[1] -=  L*(ReSum);
-  ps[3] +=  L*ImSum;
-  ps[5] +=  0; /* pathlength */
-}
 
 void E1rotation(double ps[],double X0ref, double E1)
 /* At Entrance Edge:
@@ -1417,8 +1356,10 @@ void edgey_fringe(double ps[], double inv_rho, double edge_angle, double fint,
 void CBendPass(double ps[], const int num_particles, elem_type *Elem)
 {
   int    k, m;
-  double *ps_vect, SL, L1, L2, K1, K2;
+  double *ps_vec, SL, L1, L2, K1, K2;
   bool   useT1, useT2, useR1, useR2, useFringe1, useFringe2;
+
+  const elem_mpole *mpole = Elem->mpole_ptr;
 
   SL = Elem->Length/Elem->mpole_ptr->NumIntSteps;
   L1 = SL*DRIFT1;
@@ -1427,86 +1368,62 @@ void CBendPass(double ps[], const int num_particles, elem_type *Elem)
   K2 = SL*KICK2;
 
   /* mexPrintf("E0ref=%f\n",X0ref); */
-  if(Elem->T1 == NULL)
-    useT1 = false;
-  else
-    useT1 = true;
-  if(Elem->T2 == NULL)
-    useT2 = false;
-  else
-    useT2 = true;
-  if(Elem->R1 == NULL)
-    useR1 = false;
-  else
-    useR1 = true;
-  if(Elem->R2 == NULL)
-    useR2 = false;
-  else
-    useR2 = true;
+  useT1 = (Elem->T1 != NULL);
+  useT2 = (Elem->T2 != NULL);
+  useR1 = (Elem->R1 != NULL);
+  useR2 = (Elem->R2 != NULL);
   /* if either is 0 - do not calculate fringe effects */
-  if(Elem->mpole_ptr->FringeInt1 == 0 || Elem->mpole_ptr->FullGap == 0)
-    useFringe1 = false;
-  else
-    useFringe1 = true;
-  if(Elem->mpole_ptr->FringeInt2 == 0 || Elem->mpole_ptr->FullGap == 0)
-    useFringe2 = false;
-  else
-    useFringe2 = true;
+  useFringe1 = (mpole->FringeInt1 != 0 && mpole->FullGap != 0);
+  useFringe2 = (mpole->FringeInt2 != 0 && mpole->FullGap != 0);
 
   for(k = 0; k < num_particles; k++)	{   /* Loop over particles  */
-    ps_vect = ps+k*PS_DIM;
-    if(!atIsNaN(ps_vect[0])) {
+    ps_vec = ps+k*PS_DIM;
+    if(!atIsNaN(ps_vec[0])) {
       /*  misalignment at entrance  */
-      if(useT1)	ATaddvv(ps_vect, Elem->T1);
-      if(useR1)	ATmultmv(ps_vect, Elem->R1);
+      if(useT1)	ATaddvv(ps_vec, Elem->T1);
+      if(useR1)	ATmultmv(ps_vec, Elem->R1);
       /* edge focus */
       if(useFringe1)
-	edgey_fringe(ps_vect,
-		     Elem->mpole_ptr->irho+Elem->mpole_ptr->PolynomB[1]
-		     *Elem->mpole_ptr->X0ref, Elem->mpole_ptr->EntranceAngle,
-		     Elem->mpole_ptr->FringeInt1, Elem->mpole_ptr->FullGap);
+	edgey_fringe(ps_vec, mpole->irho+mpole->PolynomB[1]*mpole->X0ref,
+		     mpole->EntranceAngle, mpole->FringeInt1, mpole->FullGap);
       else
-	edgey(ps_vect,
-	      Elem->mpole_ptr->irho
-	      +Elem->mpole_ptr->PolynomB[1]*Elem->mpole_ptr->X0ref,
-	      Elem->mpole_ptr->EntranceAngle);
+	edgey(ps_vec, mpole->irho+mpole->PolynomB[1]*mpole->X0ref,
+	      mpole->EntranceAngle);
       /* Rotate and translate to straight Cartesian coordinate */
-      E1rotation(ps_vect, Elem->mpole_ptr->X0ref,
-		 Elem->mpole_ptr->EntranceAngle);
+      E1rotation(ps_vec, mpole->X0ref, mpole->EntranceAngle);
       /* integrator */
-      for(m = 0; m < Elem->mpole_ptr->NumIntSteps; m++) {
+      for(m = 0; m < mpole->NumIntSteps; m++) {
 	/* Loop over slices */
-	ps_vect = ps+k*PS_DIM;
-	Drift(ps_vect, L1, true);
-	bndstrthinkick(ps_vect, Elem->mpole_ptr->PolynomA,
-		       Elem->mpole_ptr->PolynomB, K1, Elem->mpole_ptr->irho,
-		       Elem->mpole_ptr->MaxOrder);
-	Drift(ps_vect, L2, true);
-	bndstrthinkick(ps_vect, Elem->mpole_ptr->PolynomA,
-		       Elem->mpole_ptr->PolynomB, K2, Elem->mpole_ptr->irho,
-		       Elem->mpole_ptr->MaxOrder);
-	Drift(ps_vect, L2, true);
-	bndstrthinkick(ps_vect, Elem->mpole_ptr->PolynomA,
-		       Elem->mpole_ptr->PolynomB, K1, Elem->mpole_ptr->irho,
-		       Elem->mpole_ptr->MaxOrder);
-	Drift(ps_vect, L1, true);
+	ps_vec = ps+k*PS_DIM;
+	Drift(ps_vec, L1, true);
+	// Irho = 0.
+	thin_kick(ps_vec, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho,
+		  mpole->MaxOrder, mpole->Energy, false);
+
+	Drift(ps_vec, L2, true);
+	thin_kick(ps_vec, mpole->PolynomA, mpole->PolynomB, K2, mpole->irho,
+		  mpole->MaxOrder, mpole->Energy, false);
+	Drift(ps_vec, L2, true);
+	thin_kick(ps_vec, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho,
+		  mpole->MaxOrder, mpole->Energy, false);
+	Drift(ps_vec, L1, true);
       }
       /* Rotate and translate back to curvilinear coordinate */
-      E2rotation(ps_vect, Elem->mpole_ptr->X0ref, Elem->mpole_ptr->ExitAngle);
-      ps_vect[5] -= Elem->mpole_ptr->RefDZ;
+      E2rotation(ps_vec, mpole->X0ref, mpole->ExitAngle);
+      ps_vec[5] -= mpole->RefDZ;
       if(useFringe2)
-	edgey_fringe(ps_vect, Elem->mpole_ptr->irho
-		     +Elem->mpole_ptr->PolynomB[1]*Elem->mpole_ptr->X0ref,
-		     Elem->mpole_ptr->ExitAngle, Elem->mpole_ptr->FringeInt2,
-		     Elem->mpole_ptr->FullGap);
+	edgey_fringe(ps_vec, mpole->irho
+		     +mpole->PolynomB[1]*mpole->X0ref,
+		     mpole->ExitAngle, mpole->FringeInt2,
+		     mpole->FullGap);
       else    /* edge focus */
-	edgey(ps_vect,
-	      Elem->mpole_ptr->irho
-	      +Elem->mpole_ptr->PolynomB[1]*Elem->mpole_ptr->X0ref,
-	      Elem->mpole_ptr->ExitAngle);
+	edgey(ps_vec,
+	      mpole->irho
+	      +mpole->PolynomB[1]*mpole->X0ref,
+	      mpole->ExitAngle);
       /* Misalignment at exit */
-      if(useR2)	ATmultmv(ps_vect, Elem->R2);
-      if(useT2)	ATaddvv(ps_vect, Elem->T2);
+      if(useR2)	ATmultmv(ps_vec, Elem->R2);
+      if(useT2)	ATaddvv(ps_vec, Elem->T2);
     }
   }
 }
@@ -1534,41 +1451,6 @@ static void ATbendhxdrift6(double* r, double L,double h)
 	
   r[2]+= (1.0+h*x)*i1pd*py*L*(1.+px*hs/2.0);
   r[5]+= (1.0+h*x)*i1pd*i1pd*L/2.0*(sqr(px)+sqr(py));
-}
-
-static void bndthinkick(double* r, double* A, double* B, double L, double h,
-			int max_order)
-/*****************************************************************************
-(1) PolynomA is neglected.
-(2) The vector potential is expanded up to 4th order of x and y. 
-(3) Coefficients in PolynomB higher than 4th order is treated as if they are on straight geometry.
-(4) The Hamiltonian is H2 = - h x delta - (1+h x)As/Brho-B0 x/Brho            */
-{
-  int    i;
-  double ReSum = 0; /*B[max_order];*/
-  double ImSum = 0; /*A[max_order];*/
-    
-  double ReSumTemp;
-  double K1,K2;
-    
-  K1 = B[1];
-  K2 = (max_order>=2) ? B[2] : 0;
-    
-  ReSum = B[max_order];
-  for (i = max_order-1; i >= 0; i--) {
-    ReSumTemp = ReSum*r[0] - ImSum*r[2] + B[i];
-    ImSum = ImSum*r[0] +  ReSum*r[2] ;
-    ReSum = ReSumTemp;
-  }
-    
-  r[1] -=
-    L*(-h*r[4] + ReSum + h*(h*r[0]+K1*(r[0]*r[0]-0.5*r[2]*r[2])
-			    +K2*(r[0]*r[0]*r[0]-4.0/3.0*r[0]*r[2]*r[2])));
-  r[3] +=
-    L*(ImSum+h*(K1*r[0]*r[2]+4.0/3.0*K2*r[0]*r[0]*r[2]+(h/6.0*K1-K2/3.0)*r[2]
-		*r[2]*r[2]));
-  r[5] +=  L*h*r[0]; /* pathlength */
-    
 }
 
 static void edge_fringe2A(double* r, double inv_rho, double edge_angle,
@@ -1692,14 +1574,14 @@ void MpoleE2Pass(double ps[], const int num_particles, elem_type *Elem)
       for(m = 0; m < mpole->NumIntSteps; m++) { /* Loop over slices*/
 	ps_vec = ps+k*PS_DIM;
 	ATbendhxdrift6(ps_vec, L1, mpole->irho);
-	bndthinkick(ps_vec, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho,
-		    mpole->MaxOrder);
+	thin_kick(ps_vec, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho,
+		  mpole->MaxOrder, mpole->Energy, false);
 	ATbendhxdrift6(ps_vec,L2, mpole->irho);
-	bndthinkick(ps_vec, mpole->PolynomA, mpole->PolynomB, K2, mpole->irho,
-		    mpole->MaxOrder);
+	thin_kick(ps_vec, mpole->PolynomA, mpole->PolynomB, K2, mpole->irho,
+		  mpole->MaxOrder, mpole->Energy, false);
 	ATbendhxdrift6(ps_vec,L2, mpole->irho);
-	bndthinkick(ps_vec, mpole->PolynomA, mpole->PolynomB,  K1, mpole->irho,
-		    mpole->MaxOrder);
+	thin_kick(ps_vec, mpole->PolynomA, mpole->PolynomB, K1, mpole->irho,
+		  mpole->MaxOrder, mpole->Energy, false);
 	ATbendhxdrift6(ps_vec,L1, mpole->irho);
       }
       /* edge focus */
