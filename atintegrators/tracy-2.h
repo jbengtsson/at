@@ -4,7 +4,6 @@
 #define TWOPI  6.28318530717959
 #define C0     2.99792458e8
 
-#define SQR(X)  ((X)*(X))
 #define sqr(x)  ((x)*(x))
 #define cube(x) ((x)*(x)*(x))
 
@@ -32,11 +31,10 @@ static const double
   r_e       = 2.817940285e-15, /* electron classic radius, [m] */
   XMC2      = 0.510998902e-03, /* mc^2 in GeV */
   PI        = 3.141592653589793238462643383279502884197e0,
-  epsilon_o = 8.854187817e-12; /* Vacuum permittivity */
+  epsilon_o = 8.854187817e-12, /* Vacuum permittivity */
+  C_gamma   = 8.846056192e-05; /* [m]/[GeV^3] Ref[1] (4.1) */
 
-#define CGAMMA 8.846056192e-05 /* [m]/[GeV^3] Ref[1] (4.1) */
-
-double C_u, C_gamma, C_q, cl_rad, q_fluct;
+double C_u, C_q, cl_rad, q_fluct;
 
 
 enum spatial_ind

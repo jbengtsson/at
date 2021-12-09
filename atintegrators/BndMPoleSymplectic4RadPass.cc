@@ -8,7 +8,7 @@ trackFunction(const PyObject *ElemData, struct elem_type *Elem, double ps[],
 {
   if (!Elem) Elem = init_mpole(ElemData, Elem, true, false, true, false);
   if (Elem) {
-    BendRadPass(ps, num_particles, Elem);
+    MpolePass(ps, num_particles, Elem, true);
     return Elem;
   } else
     return NULL;

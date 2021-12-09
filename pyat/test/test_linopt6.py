@@ -11,12 +11,12 @@ def test_linopt6_norad(lattice):
     refpts = range(len(lattice) + 1)
     ld02, rd2, ld2 = linopt2(lattice, refpts, get_w=True)
     ld06, rd6, ld6 = linopt6(lattice, refpts, get_w=True)
-    assert_close(rd2.tune, rd6.tune, atol=1e-12, rtol=0)
-    assert_close(rd2.chromaticity, rd6.chromaticity, atol=1e-12, rtol=0)
+    assert_close(rd2.tune, rd6.tune, atol=1e-10, rtol=0)
+    assert_close(rd2.chromaticity, rd6.chromaticity, atol=1e-10, rtol=0)
 
     for field in ['s_pos', 'closed_orbit', 'dispersion', 'alpha', 'beta', 'mu']:
         assert_close(ld2[field], ld6[field], atol=1e-10, rtol=0, err_msg=field)
-    assert_close(ld2.W, ld6.W, atol=1e-6, rtol=0)
+    assert_close(ld2.W, ld6.W, atol=1e-6, rtol=1e-7)
 
 
 @pytest.mark.parametrize('lattice', [pytest.lazy_fixture('hmba_lattice')])
