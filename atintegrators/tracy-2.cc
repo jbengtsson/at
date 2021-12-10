@@ -135,6 +135,11 @@ static double* atGetOptionalDoubleArray(const PyObject *element, char *name)
   return atGetOptionalDoubleArraySz(element, name, &msz, &nsz);
 }
 
+
+extern "C" struct elem_type*
+trackFunction(const PyObject *ElemData, struct elem_type *Elem, double ps[],
+	      const int num_particles, const struct parameters *Param);
+
 //------------------------------------------------------------------------------
 
 // Interface functions for: Armidillo vectors, STL vectors, and C arrays.
