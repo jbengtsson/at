@@ -10,7 +10,6 @@
    radiation integrals', Phys.Rev.E  Vol.49 p.751 (1994)
 */
 
-#include "elem.cc"
 #include "tracy-2.cc"
 
 /* Fourth order-symplectic integrator constants */

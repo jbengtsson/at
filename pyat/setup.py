@@ -114,7 +114,7 @@ if exists(integrator_src_orig):
     source_files = glob.glob(join(integrator_src_orig, '*.h'))
     source_files.extend(glob.glob(join(integrator_src_orig, '*.cc')))
     source_files.extend(
-        glob.glob(join(diffmatrix_source, 'findmpoleraddiffmatrix.cc'))
+        glob.glob(join(diffmatrix_source, 'diff_mat.cc'))
     )
     if not exists(integrator_src):
         os.makedirs(integrator_src)
@@ -122,7 +122,7 @@ if exists(integrator_src_orig):
         shutil.copy2(f, integrator_src)
 
 pass_methods = glob.glob(join(integrator_src, '*Pass.cc'))
-diffmatrix_method = join(integrator_src, 'findmpoleraddiffmatrix.cc')
+diffmatrix_method = join(integrator_src, 'diff_mat.cc')
 print('\npass_methods:\n')
 for m in pass_methods:
     print(m)

@@ -117,6 +117,7 @@ def tst_cases(lat):
         ps = numpy.zeros(6,)
         print('\n', lat[0])
         del lat[0].PassMethod
+        # Lattice, phase-space vector, numer of particles.
         atpass(lat, ps, 1)
 
     if False:

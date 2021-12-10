@@ -1,3 +1,6 @@
+#include "tracy-2.cc"
+
+
 /* Exact integrator for different element types
  
    This method will work for a drift, a quadrupole, a sextupole or a
@@ -19,10 +22,6 @@
    as the 'BndMPoleSymplectic4E2Pass'. See Forest p362 for a detailed 
    explanation of the vector potential in curvilinear co-ordinates.           */
 
-#include <string.h>
-
-#include "elem.cc"
-#include "tracy-2.cc"
 
 
 struct elem_type*

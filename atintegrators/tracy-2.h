@@ -1,23 +1,31 @@
 
-#define PS_DIM 6
+#define PS_DIM   6
 
-#define TWOPI  6.28318530717959
-#define C0     2.99792458e8
+#define TWOPI    6.28318530717959
+#define C0       2.99792458e8
+
+#define HOMmax    21
+
+#define DRIFT1      0.6756035959798286638
+#define DRIFT2     -0.1756035959798286639
+#define KICK1       1.351207191959657328
+#define KICK2      -1.702414383919314656
+
+#define WHmax      200
+#define GWIG_EPS   (1e-6)
+#define second     2
+#define fourth     4
+
+#define atIsFinite isfinite
+#define atIsNaN    isnan
+#define atGetNaN() (NAN)
+#define atGetInf() (INFINITY)
+#define atMalloc   malloc
+#define atCalloc   calloc
+#define atFree     free
 
 #define sqr(x)  ((x)*(x))
 #define cube(x) ((x)*(x)*(x))
-
-#define HOMmax  21
-
-#define DRIFT1    0.6756035959798286638
-#define DRIFT2   -0.1756035959798286639
-#define KICK1     1.351207191959657328
-#define KICK2    -1.702414383919314656
-
-#define WHmax    200
-#define GWIG_EPS (1e-6)
-#define second   2
-#define fourth   4
 
 
 static const int
@@ -209,3 +217,10 @@ struct elem_type {
     elem_H     *H_ptr;
   };
 };
+
+// For HamPass.
+struct lattice {
+  elem_type *next;
+  int       N;
+};
+
