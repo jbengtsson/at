@@ -18,9 +18,7 @@
 #define NUMPY_IMPORT_ARRAY_RETVAL NULL
 #define NUMPY_IMPORT_ARRAY_TYPE void *
 
-
-#include "attypes.h"
-
+#include "at_types.h"
 
 #define ATPY_PASS "trackFunction"
 
@@ -531,7 +529,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
 
     param.nturn = turn;
     nextrefindex = 0;
-    nextref= (nextrefindex<num_refpts) ? refpts[nextrefindex++] : INT_MAX;
+    nextref = (nextrefindex<num_refpts) ? refpts[nextrefindex++] : INT_MAX;
     for (elem_index = 0; elem_index < num_elements; elem_index++) {
       if (elem_index == nextref) {
 	memcpy(drout, drin, np6*sizeof(double));

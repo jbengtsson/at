@@ -2,12 +2,12 @@
 
 #include <armadillo>
 
-#include "atcommon.h"
-#include "attypes.h"
+#include "at_common.h"
+#include "at_types.h"
 
 #include "tracy-2.h"
 
-#include "atlalib.cc"
+#include "at_lalib.cc"
 
 
 //------------------------------------------------------------------------------
@@ -649,7 +649,7 @@ struct elem_type* init_H(const PyObject *ElemData, struct elem_type *Elem)
 
 //------------------------------------------------------------------------------
 
-// Tracy-2 beam dynamics functions.
+// Tracy-2/Thor_scsi Interface -- Beam Dynamics Functions.
 
 inline double get_p_s(const std::vector<double> &ps)
 {
@@ -1342,7 +1342,28 @@ void CorrectorPass(double ps[], const int num_particles,
 
 /* track.cc
    tracking routines for exact Hamiltonian from Forest / PTC / Tracy-3
-   James Rowland 2010                                                         */
+   James Rowland 2010
+
+   Exact integrator for different element types
+ 
+   This method will work for a drift, a quadrupole, a sextupole or a
+   bending magnet. It distinguishes between these using the Class field
+   on the element.
+
+   The 'ExactHamiltonianPass' method uses the square root hamiltonian in
+   cartesian co-ordinates (see other notes for derivation). 
+   This is equivalent to setting exact=true in MADX-PTC.
+   Multipole fringe fields are also enabled for quadrupoles
+   (fringe = true option in MADX-PTC). 
+
+   Note that the PolynomB array in the exact cartesian rectangular bend 
+   refers to the normalized straight multipole components of the vector 
+   potential, so PolynomB(1) should be set to 1/rho (B_bend / Brho). 
+   The conjugate momenta in the curvilinear co-ordinate system are not 
+   the same as in the cartesian system so PolynomB(1) must be set back 
+   to zero when using a curvilinear symplectic integrator method such 
+   as the 'BndMPoleSymplectic4E2Pass'. See Forest p362 for a detailed 
+   explanation of the vector potential in curvilinear co-ordinates.           */
 
 #undef DEBUG_MODE
 
