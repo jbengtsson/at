@@ -135,10 +135,9 @@ static double* atGetOptionalDoubleArray(const PyObject *element, char *name)
   return atGetOptionalDoubleArraySz(element, name, &msz, &nsz);
 }
 
+//------------------------------------------------------------------------------
 
-extern "C" struct elem_type*
-trackFunction(const PyObject *ElemData, struct elem_type *Elem, double ps[],
-	      const int num_particles, const struct parameters *Param);
+// Interface functions for: Armidillo vectors, STL vectors, and C arrays.
 
 inline std::vector<double> vectostl(const arma::vec &vec)
 { return {vec(x_), vec(px_), vec(y_), vec(py_), vec(delta_), vec(ct_), 1e0}; }
@@ -154,8 +153,6 @@ void vectoarr(const arma::vec &vec, double a[])
   for (int k = 0; k < PS_DIM; k++)
     a[k] = vec(k);
 }
-
-//------------------------------------------------------------------------------
 
 inline std::vector<double> arrtostl(const double a[])
 {
@@ -1720,7 +1717,7 @@ void track_element(T *x, const elem_type *Elem)
   }
 }
 
-extern "C" void track_map(double * x, lattice * lat, double * map1)
+void track_map(double * x, lattice * lat, double * map1)
 {
   fprintf(stderr,
 	  "track_map is not available, rebuild with #define TPSA_MODE\n");
