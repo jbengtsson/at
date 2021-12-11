@@ -965,6 +965,52 @@ void DriftPass(double *ps, const int num_particles,
 
 //------------------------------------------------------------------------------
 
+void CorrectorPass(double ps[], const int num_particles,
+		   const struct elem_type *Elem)
+/* xkick, ykick - horizontal and vertical kicks in radiand
+   r - 6-by-N matrix of initial conditions reshaped into
+   1-d array of 6*N elements                                                  */
+{
+  int    k;
+  double *ps_vec, xkick, ykick;
+
+  if (Elem->Length == 0e0)
+    for(k = 0; k < num_particles; k++) {
+      ps_vec = ps+k*PS_DIM;
+      if(!atIsNaN(ps[0])) {
+	ps[1] += Elem->corr_ptr->KickAngle[0];
+	ps[3] += Elem->corr_ptr->KickAngle[1];
+      }
+    }
+  else {
+
+#pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD)    \
+  default(none) shared(ps, num_particles, len, xkick, ykick) private(c)
+
+    xkick = Elem->corr_ptr->KickAngle[0];
+    ykick = Elem->corr_ptr->KickAngle[1];
+    for(k = 0; k < num_particles; k++) {
+      ps_vec = ps+k*PS_DIM;
+      if(!atIsNaN(ps[0])) {
+	double
+	  p_norm = 1/(1+ps[4]),
+	  NormL  = Elem->Length*p_norm;
+
+	ps[5] +=
+	  NormL*p_norm*(xkick*xkick/3 + ykick*ykick/3 + ps[1]*ps[1]
+			+ ps[3]*ps[3] + ps[1]*xkick + ps[3]*ykick)/2;
+
+	ps[0] += NormL*(ps[1]+xkick/2);
+	ps[1] += xkick;
+	ps[2] += NormL*(ps[3]+ykick/2);
+	ps[3] += ykick;
+      }
+    }
+  }
+}
+
+//------------------------------------------------------------------------------
+
 void edge_fringe(double ps[], const double inv_rho,
 		 const double edge_angle, const double fint,
 		 const double gap, const int method, const bool hor)
@@ -1297,51 +1343,6 @@ void Matrix66Pass(double ps[], const int num_particles,
 
 //------------------------------------------------------------------------------
 
-void CorrectorPass(double ps[], const int num_particles,
-		   const struct elem_type *Elem)
-/* xkick, ykick - horizontal and vertical kicks in radiand 
-   r - 6-by-N matrix of initial conditions reshaped into 
-   1-d array of 6*N elements                                                  */
-{
-  int    k;
-  double *ps_vec, xkick, ykick;
-
-  if (Elem->Length == 0e0)
-    for(k = 0; k < num_particles; k++) {
-      ps_vec = ps+k*PS_DIM;
-      if(!atIsNaN(ps[0])) {
-	ps[1] += Elem->corr_ptr->KickAngle[0];
-	ps[3] += Elem->corr_ptr->KickAngle[1]; 		    
-      }
-    }
-  else {
-
-#pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD)    \
-  default(none) shared(ps, num_particles, len, xkick, ykick) private(c)
-
-    xkick = Elem->corr_ptr->KickAngle[0];
-    ykick = Elem->corr_ptr->KickAngle[1];
-    for(k = 0; k < num_particles; k++) {
-      ps_vec = ps+k*PS_DIM;
-      if(!atIsNaN(ps[0])) {
-	double
-	  p_norm = 1/(1+ps[4]),
-	  NormL  = Elem->Length*p_norm;
-
-	ps[5] +=
-	  NormL*p_norm*(xkick*xkick/3 + ykick*ykick/3 + ps[1]*ps[1]
-			+ ps[3]*ps[3] + ps[1]*xkick + ps[3]*ykick)/2;
-
-	ps[0] += NormL*(ps[1]+xkick/2);
-	ps[1] += xkick;
-	ps[2] += NormL*(ps[3]+ykick/2);
-	ps[3] += ykick;
-      }
-    }
-  }
-}
-//------------------------------------------------------------------------------
-
 /* track.cc
    tracking routines for exact Hamiltonian from Forest / PTC / Tracy-3
    James Rowland 2010
@@ -1578,7 +1579,6 @@ void fr4(T *x, const double L, const double *F, const int nF, const int slices)
       x[py_] -= d[n] * ds * -fi;
     }
   }
-
 }
 
 /* bend fringe */
@@ -1692,19 +1692,19 @@ void track_element(T *x, const elem_type *Elem)
 
   Log(("track element\n"));
   switch(H->Type) {
-  case drift:
+  case element_type(drift):
     Log(("drift %f\n", Elem->Length));
     exact_drift(x, Elem->Length);
     x[ct_] -= Elem->Length;
     break;
-  case dipole:
+  case element_type(dipole):
     Log(("bend %f %f %f\n", Elem->Length, H->BendingAngle,
 	 creal(Elem->F[0])));
     bend(x, H->Type, Elem->Length, H->BendingAngle, H->gK, H->F, H->MaxOrder,
 	 H->NumIntSteps, H->MultipoleFringe);
     x[ct_] -= Elem->Length;
     break;
-  case multipole:
+  case element_type(multipole):
     Log(("multipole %f %f\n", Elem->Length, creal(H->PolynomB[1])));
     if(H->MultipoleFringe)
       mpole_fringe(x, H->Type, Elem->Length, H->F, H->MaxOrder, 0);
@@ -1713,7 +1713,7 @@ void track_element(T *x, const elem_type *Elem)
       mpole_fringe(x, H->Type, Elem->Length, H->F, H->MaxOrder, 1);
     x[ct_] -= Elem->Length;
     break;
-  case marker:
+  case element_type(marker):
     Log(("marker\n"));
     break;
   default:
@@ -2604,3 +2604,55 @@ void WigRadPass(double ps[], const int num_particles, struct elem_type *Elem)
 }
 
 //------------------------------------------------------------------------------
+
+#if 0
+
+extern "C" struct elem_type*
+propagator(const PyObject *ElemData, struct elem_type *Elem, double ps[],
+	   const int num_particles, const struct parameters *Param)
+{
+  switch (elem->kind) {
+  case id_:
+    IdentityPass(ps, num_particles, Elem)
+    break;
+  case ap_:
+    AperturePass(ps, num_particles, Elem)
+    break;
+  case drift_:
+    DriftPass(ps, num_particles, Elem)
+    break;
+  case corr_:
+    CorrectorPass(ps, num_particles, Elem)
+    break;
+  case mpole_:
+    MpolePass(ps, num_particles, Elem)
+    break;
+  case cbend_:
+    CBendPass(ps, num_particles, Elem)
+    break;
+  case mpole_exact:
+    MpoleE2Pass(ps, num_particles, Elem)
+    break;
+  case cav_:
+    CavityPass(ps, num_particles, Elem)
+    break;
+  case M66_:
+    Matrix66Pass(ps, num_particles, Elem)
+    break;
+  case H_:
+    HamPass(ps, num_particles, Elem)
+    break;
+  case wig_:
+    WigPass(ps, num_particles, Elem)
+    break;
+  otherwise:
+    printf("\npropagator: undef. kind %d\n", elem->kind);
+    exit(1);
+    break;
+  }
+};
+
+#endif
+
+//------------------------------------------------------------------------------
+

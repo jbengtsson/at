@@ -1,8 +1,5 @@
 
-#define PS_DIM   6
-
-#define TWOPI    6.28318530717959
-#define C0       2.99792458e8
+#define TWOPI     6.28318530717959
 
 #define HOMmax    21
 
@@ -46,19 +43,23 @@ double C_u, C_q, cl_rad, q_fluct;
 
 
 enum spatial_ind
-  { X_ = 0,
-    Y_ = 1,
-    Z_ = 2 };
+  {
+   X_ = 0,
+   Y_,
+   Z_
+  };
 
 enum phase_space_ind
-  { x_     = 0,
-    px_    = 1,
-    y_     = 2,
-    py_    = 3,
-    delta_ = 4,
-    ct_    = 5 };
+  {
+   x_ = 0,
+    px_,
+    y_,
+    py_,
+    delta_,
+    ct_
+  };
 
-// Used by track.cc.
+// Used by track_element.
 enum element_type
   {
    drift = 0,
@@ -67,14 +68,31 @@ enum element_type
    marker
   };
 
+enum elem_kind
+  {
+   corr_ = 0,
+   id_,
+   ap_,
+   drift_,
+   mpole_,
+   cbend_,
+   mpole_exact,
+   cav_,
+   wig_,
+   M66_,
+   H_
+  };
+
 enum MpoleKind
-  { All    = 0,
-    Dip    = 1,
-    Quad   = 2,
-    Sext   = 3,
-    Oct    = 4,
-    Dec    = 5,
-    Dodec  = 6 };
+  {
+   All = 0,
+   Dip,
+   Quad,
+   Sext,
+   Oct,
+   Dec5,
+   Dodec
+  };
 
 struct elem_id { };
 
@@ -205,16 +223,18 @@ struct elem_type {
     *T2,
     *EApertures,
     *RApertures;
+  elem_kind
+    kind;
   union {
     elem_id    *id_ptr;
     elem_ap    *ap_ptr;
     elem_drift *drift_ptr;
+    elem_corr  *corr_ptr;
     elem_mpole *mpole_ptr;
     elem_cav   *cav_ptr;
-    elem_wig   *wig_ptr;
     elem_M66   *M66_ptr;
-    elem_corr  *corr_ptr;
     elem_H     *H_ptr;
+    elem_wig   *wig_ptr;
   };
 };
 
