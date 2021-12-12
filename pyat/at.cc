@@ -9,7 +9,6 @@ static npy_uint32     num_elements         = 0;
 static union elem     **elemdata_list      = NULL;
 static PyObject       **element_list       = NULL;
 static track_function *integrator_list     = NULL;
-static PyObject       **pyintegrator_list  = NULL;
 static PyObject       **kwargs_list        = NULL;
 static char           integrator_path[300];
 
@@ -19,7 +18,7 @@ static void set_lost(double *drin, npy_uint32 np)
   unsigned int n, c;
   double       *r6;
 
-  for (c=0; c<np; c++) {/* Loop over particles */
+  for (c = 0; c < np; c++) {/* Loop over particles */
     r6 = drin+c*PS_DIM;
     if (isfinite(r6[0])) {  /* No change if already marked */
       for (n = 0; n < PS_DIM; n++) {
@@ -346,7 +345,6 @@ bool keep_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
   npy_uint32     elem_index;
   PyObject       **element;
   track_function *integrator;
-  PyObject       **pyintegrator;
 
   /* Release the stored elements */
   for (elem_index = 0; elem_index < num_elements; elem_index++) {
@@ -370,20 +368,12 @@ bool keep_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
     (track_function*)realloc(integrator_list,
 			      num_elements*sizeof(track_function));
 
-  /* pointer to the list of python integrators, make sure all pointers are
-     initially NULL */
-  free(pyintegrator_list);
-  pyintegrator_list = (PyObject **)calloc(num_elements, sizeof(PyObject *));
-
-  /* pointer to the list of python integrators kwargs, make sure all pointers
-     are initially NULL */
   free(kwargs_list);
   kwargs_list = (PyObject **)calloc(num_elements, sizeof(PyObject *));
 
   lattice_length = 0e0;
   element = element_list;
   integrator = integrator_list;
-  pyintegrator = pyintegrator_list;
   for (elem_index = 0; elem_index < num_elements; elem_index++) {
     PyObject *el           = PyList_GET_ITEM(lattice, elem_index);
     PyObject *PyPassMethod = PyObject_GetAttrString(el, "PassMethod");
@@ -394,20 +384,23 @@ bool keep_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
       print_error(elem_index, rout);
       return false;
     }
+
     LibraryListPtr = get_track_function(PyUnicode_AsUTF8(PyPassMethod));
     if (!LibraryListPtr) {
       /* No trackFunction for the given PassMethod */
       print_error(elem_index, rout);
       return false;
     }
+
     length = PyFloat_AsDouble(PyObject_GetAttrString(el, "Length"));
     if (PyErr_Occurred())
       PyErr_Clear();
     else
       lattice_length += length;
+
     *integrator++ = LibraryListPtr->FunctionHandle;
-    *pyintegrator++ = LibraryListPtr->PyFunctionHandle;
     *element++ = el;
+
     /* Keep a reference to each element in case of reuse */
     Py_INCREF(el);
     Py_DECREF(PyPassMethod);
