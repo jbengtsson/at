@@ -38,22 +38,20 @@ static void set_lost(double *drin, npy_uint32 np)
 }
 
 static void
-check_if_lost(double *drin, const npy_uint32 np, const int num_elem,
-	      const int num_turn,
-	      int *xnturn, int *xnelem, bool *xlost, double *xlostcoord)
+check_if_lost(lat_type &lat, double *drin, const int num_elem)
 {
   unsigned int n, c;
   double       *r6;
 
-  for (c = 0; c < np; c++) {/* Loop over particles */
-    if (!xlost[c]) {  /* No change if already marked */
+  for (c = 0; c < lat.num_particles; c++) {/* Loop over particles */
+    if (!lat.bxlost[c]) {  /* No change if already marked */
       r6 = drin+c*PS_DIM;
       for (n = 0; n < PS_DIM; n++) {
 	if (!isfinite(r6[n]) || ((fabs(r6[n])>LIMIT_AMPLITUDE)&&n<5)) {
-	  xlost[c] = 1;
-	  xnturn[c] = num_turn;
-	  xnelem[c] = num_elem;
-	  memcpy(xlostcoord+PS_DIM*c, r6, PS_DIM*sizeof(double));
+	  lat.bxlost[c] = true;
+	  lat.ixnturn[c] = lat.param.nturn;
+	  lat.ixnelem[c] = num_elem;
+	  memcpy(lat.dxlostcoord+PS_DIM*c, r6, PS_DIM*sizeof(double));
 	  r6[0] = NAN;
 	  r6[1] = 0;
 	  r6[2] = 0;
@@ -455,8 +453,7 @@ bool track(lat_type &lat, double *drin, double *&drout, PyObject *rout)
       return false;
     }
     if (lat.losses)
-      check_if_lost(drin, lat.num_particles, elem_index, lat.param.nturn,
-		    lat.ixnturn, lat.ixnelem, lat.bxlost, lat.dxlostcoord);
+      check_if_lost(lat, drin, elem_index);
     else
       set_lost(drin, lat.num_particles);
     element++;

@@ -9,10 +9,4 @@
 #define C0     2.99792458e8
 
 
-struct parameters {
-  int    nturn;
-  double RingLength;
-  double T0;
-};
-
 #endif /*ATTYPES_H*/

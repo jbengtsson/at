@@ -43,7 +43,12 @@ typedef union elem*
 (*track_function)(const PyObject *element, union elem *elemptr,
 		  double *r_in, int num_particles, struct parameters *param);
 
-/* For AT defined in atpass.c. */
+struct parameters {
+  int    nturn;
+  double RingLength;
+  double T0;
+};
+
 static struct LibraryListElement {
   const char                *MethodName;
   LIBRARYHANDLETYPE         LibraryHandle;
