@@ -66,6 +66,7 @@ struct lat_type {
   unsigned int
     num_refpts;
   int
+    num_turns,
     *ixnturn,
     *ixnelem;
   double

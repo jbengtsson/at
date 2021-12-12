@@ -532,8 +532,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     lattice_length = 0e0;
 
   int
-    turn,
-    num_turns;
+    turn;
   double
     *drin,
     *drout;
@@ -560,13 +559,13 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
 #endif /*_OPENMP*/
 
   if (!get_input
-      (args, kwargs, lattice, rin, num_turns, refs, keep_lattice,
+      (args, kwargs, lattice, rin, lat.num_turns, refs, keep_lattice,
        omp_num_threads, losses))
     return NULL;
 
   lat.num_particles = (PyArray_SIZE(rin)/PS_DIM);
-  lat.np6 = lat.num_particles*PS_DIM;
-  drin = static_cast<double*>(PyArray_DATA(rin));
+  lat.np6           = lat.num_particles*PS_DIM;
+  drin              = static_cast<double*>(PyArray_DATA(rin));
 
   if (refs) {
     if (PyArray_TYPE(refs) != NPY_UINT32) {
@@ -583,7 +582,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
   outdims[0] = PS_DIM;
   outdims[1] = lat.num_particles;
   outdims[2] = lat.num_refpts;
-  outdims[3] = num_turns;
+  outdims[3] = lat.num_turns;
 
   rout  = PyArray_EMPTY(4, outdims, NPY_DOUBLE, 1);
   drout = static_cast<double*>(PyArray_DATA((PyArrayObject*)rout));
@@ -608,10 +607,10 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
 
   lat.param.RingLength = lattice_length;
   lat.param.T0         = lattice_length/C0;
-  for (turn = 0; turn < num_turns; turn++) {
+
+  for (turn = 0; turn < lat.num_turns; turn++) {
     lat.param.nturn = turn;
-    if (!track(lat, drin, losses, drout, rout))
-      return NULL;
+    if (!track(lat, drin, losses, drout, rout)) return NULL;
   }
   valid = 1;      /* Tracking successful: the lattice can be reused */
 
