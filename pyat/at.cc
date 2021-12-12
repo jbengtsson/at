@@ -13,57 +13,6 @@ static PyObject       **kwargs_list        = NULL;
 static char           integrator_path[300];
 
 
-static void set_lost(double *drin, npy_uint32 np)
-{
-  unsigned int n, c;
-  double       *r6;
-
-  for (c = 0; c < np; c++) {/* Loop over particles */
-    r6 = drin+c*PS_DIM;
-    if (isfinite(r6[0])) {  /* No change if already marked */
-      for (n = 0; n < PS_DIM; n++) {
-	if (!isfinite(r6[n]) || ((fabs(r6[n]) > LIMIT_AMPLITUDE) && n < 5)) {
-	  r6[0] = NAN;
-	  r6[1] = 0;
-	  r6[2] = 0;
-	  r6[3] = 0;
-	  r6[4] = 0;
-	  r6[5] = 0;
-	  break;
-	}
-      }
-    }
-  }
-}
-
-static void
-check_if_lost(lat_type &lat, double *drin, const int num_elem)
-{
-  unsigned int n, c;
-  double       *r6;
-
-  for (c = 0; c < lat.num_particles; c++) {/* Loop over particles */
-    if (!lat.bxlost[c]) {  /* No change if already marked */
-      r6 = drin+c*PS_DIM;
-      for (n = 0; n < PS_DIM; n++) {
-	if (!isfinite(r6[n]) || ((fabs(r6[n])>LIMIT_AMPLITUDE)&&n<5)) {
-	  lat.bxlost[c] = true;
-	  lat.ixnturn[c] = lat.param.nturn;
-	  lat.ixnelem[c] = num_elem;
-	  memcpy(lat.dxlostcoord+PS_DIM*c, r6, PS_DIM*sizeof(double));
-	  r6[0] = NAN;
-	  r6[1] = 0;
-	  r6[2] = 0;
-	  r6[3] = 0;
-	  r6[4] = 0;
-	  r6[5] = 0;
-	  break;
-	}
-      }
-    }
-  }
-}
-
 //------------------------------------------------------------------------------
 
 static PyObject *print_error(int elem_number, PyObject *rout)
@@ -148,10 +97,11 @@ static PyObject *isopenmp(PyObject *self)
 static struct LibraryListElement*
 SearchLibraryList(struct LibraryListElement *head, const char *method_name)
 {
-  if (head)
+  if (head) {
+    printf("\nSearchLibraryList: %s\n", method_name);
     return (strcmp(head->MethodName, method_name) == 0)?
       head : SearchLibraryList(head->Next, method_name);
-  else
+  } else
     return NULL;
 }
 
@@ -198,7 +148,6 @@ static struct LibraryListElement* get_track_function(const char *fn_name)
       strcpy(static_cast<char*>(malloc(strlen(fn_name)+1)), fn_name);
     LibraryListPtr->LibraryHandle = dl_handle;
     LibraryListPtr->FunctionHandle = fn_handle;
-    LibraryListPtr->PyFunctionHandle = pyfunction;
     LibraryListPtr->Next = LibraryList;
     LibraryList = LibraryListPtr;
   }
@@ -408,21 +357,72 @@ bool keep_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
   return true;
 }
 
+static void
+check_if_lost(lat_type &lat, double *drin, const int num_elem)
+{
+  unsigned int n, c;
+  double       *r6;
+
+  for (c = 0; c < lat.num_particles; c++) {/* Loop over particles */
+    if (!lat.bxlost[c]) {  /* No change if already marked */
+      r6 = drin+c*PS_DIM;
+      for (n = 0; n < PS_DIM; n++) {
+	if (!isfinite(r6[n]) || ((fabs(r6[n])>LIMIT_AMPLITUDE)&&n<5)) {
+	  lat.bxlost[c] = true;
+	  lat.ixnturn[c] = lat.param.nturn;
+	  lat.ixnelem[c] = num_elem;
+	  memcpy(lat.dxlostcoord+PS_DIM*c, r6, PS_DIM*sizeof(double));
+	  r6[0] = NAN;
+	  r6[1] = 0;
+	  r6[2] = 0;
+	  r6[3] = 0;
+	  r6[4] = 0;
+	  r6[5] = 0;
+	  break;
+	}
+      }
+    }
+  }
+}
+
+static void set_lost(double *drin, npy_uint32 np)
+{
+  unsigned int n, c;
+  double       *r6;
+
+  for (c = 0; c < np; c++) {/* Loop over particles */
+    r6 = drin+c*PS_DIM;
+    if (isfinite(r6[0])) {  /* No change if already marked */
+      for (n = 0; n < PS_DIM; n++) {
+	if (!isfinite(r6[n]) || ((fabs(r6[n]) > LIMIT_AMPLITUDE) && n < 5)) {
+	  r6[0] = NAN;
+	  r6[1] = 0;
+	  r6[2] = 0;
+	  r6[3] = 0;
+	  r6[4] = 0;
+	  r6[5] = 0;
+	  break;
+	}
+      }
+    }
+  }
+}
+
 bool track(lat_type &lat, double *drin, double *&drout, PyObject *rout)
 {
   unsigned int
     nextrefindex;
   union elem
-    **elemdata     = elemdata_list;
+    **elemdata   = elemdata_list;
   npy_uint32
     elem_index,
     nextref;
   PyObject
-    **element      = element_list;
+    **element    = element_list;
   track_function
-    *integrator    = integrator_list;
+    *integrator  = integrator_list;
   PyObject
-    **kwargs       = kwargs_list;
+    **kwargs     = kwargs_list;
 
   nextrefindex = 0;
   nextref = (nextrefindex < lat.num_refpts)?

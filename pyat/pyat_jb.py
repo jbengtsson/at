@@ -228,14 +228,14 @@ else:
         at.load_tracy(lat_names[lat_name], harmonic_number=538,
                       lattice_key='cell')
 
-if not False:
+if False:
     for elem in lat:
         print(elem)
     exit(0)
 
 lat.radiation_off()
 
-if not False:
+if False:
     tst_cases(lat)
     exit(0)
 

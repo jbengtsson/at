@@ -53,7 +53,6 @@ static struct LibraryListElement {
   const char                *MethodName;
   LIBRARYHANDLETYPE         LibraryHandle;
   track_function            FunctionHandle;
-  PyObject                  *PyFunctionHandle;
   struct LibraryListElement *Next;
 } *LibraryList = NULL;
 
