@@ -43,14 +43,6 @@ typedef union elem*
 (*track_function)(const PyObject *element, union elem *elemptr,
 		  double *r_in, int num_particles, struct parameters *param);
 
-static npy_uint32     num_elements         = 0;
-static union elem     **elemdata_list      = NULL;
-static PyObject       **element_list       = NULL;
-static track_function *integrator_list     = NULL;
-static PyObject       **pyintegrator_list  = NULL;
-static PyObject       **kwargs_list        = NULL;
-static char           integrator_path[300];
-
 /* For AT defined in atpass.c. */
 static struct LibraryListElement {
   const char                *MethodName;

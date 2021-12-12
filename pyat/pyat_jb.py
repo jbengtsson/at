@@ -135,7 +135,7 @@ def tst_cases(lat):
         lattice = [q]
         ps = numpy.array(numpy.zeros((6, 1)), order='F')
         ps[0, 0] = 1e-6
-        atpass(lattice, ps, 1)
+        atpass(lat, ps, 1)
         print('\n', ps)
         exit(0)
 

@@ -4,7 +4,17 @@
 #include "at_types.h"
 #include "at.h"
 
-static void setlost(double *drin, npy_uint32 np)
+
+static npy_uint32     num_elements         = 0;
+static union elem     **elemdata_list      = NULL;
+static PyObject       **element_list       = NULL;
+static track_function *integrator_list     = NULL;
+static PyObject       **pyintegrator_list  = NULL;
+static PyObject       **kwargs_list        = NULL;
+static char           integrator_path[300];
+
+
+static void set_lost(double *drin, npy_uint32 np)
 {
   unsigned int n, c;
   double       *r6;
@@ -240,22 +250,9 @@ bool get_input(PyObject *&args, PyArrayObject *&rin, PyObject *&element)
   return true;
 }
 
-/* Call python integrators */
-static PyObject
-*pyIntegratorPass(double *r_in, PyObject *function, PyObject *kwargs,
-		  const int num_particles)
-{
-  PyObject *args;
-
-  args = Buildargs(r_in, num_particles);
-  PyObject_Call(function, args, kwargs);
-  Py_DECREF(args);
-  return kwargs;
-}
-
 static PyObject *at_elempass(PyObject *self, PyObject *args)
 {
-  PyObject                  *element, *PyPassMethod, *pyintegrator;
+  PyObject                  *element, *PyPassMethod;
   PyArrayObject             *rin;
   npy_uint32                num_particles;
   track_function            integrator;
@@ -277,21 +274,12 @@ static PyObject *at_elempass(PyObject *self, PyObject *args)
   LibraryListPtr = get_track_function(PyUnicode_AsUTF8(PyPassMethod));
   Py_DECREF(PyPassMethod);
   integrator = LibraryListPtr->FunctionHandle;
-  pyintegrator = LibraryListPtr->PyFunctionHandle;
-  if (pyintegrator) {
-    PyObject *kwargs = Buildkwargs(element);
 
-    kwargs = pyIntegratorPass(drin, pyintegrator, kwargs, num_particles);
-    if (!kwargs) return NULL;
-    Py_DECREF(kwargs);
-  } else {
-    union elem *elem_data =
-      integrator(element, NULL, drin, num_particles, &param);
+  union elem *elem_data =
+    integrator(element, NULL, drin, num_particles, &param);
 
-    if (!elem_data) return NULL;
-    free(elem_data);
-  }
-  if (pyintegrator) Py_DECREF(pyintegrator);
+  if (!elem_data) return NULL;
+  free(elem_data);
   Py_RETURN_NONE;
 }
 
@@ -443,8 +431,6 @@ bool track(lat_type &lat, double *drin, double *&drout, PyObject *rout)
   track_function
     *integrator    = integrator_list;
   PyObject
-    **pyintegrator = pyintegrator_list;
-  PyObject
     **kwargs       = kwargs_list;
 
   nextrefindex = 0;
@@ -458,34 +444,23 @@ bool track(lat_type &lat, double *drin, double *&drout, PyObject *rout)
       nextref = (nextrefindex < lat.num_refpts)?
 	lat.refpts[nextrefindex++] : INT_MAX;
     }
+
     /* the actual integrator call */
-    if (*pyintegrator) {
-      if (!*kwargs) *kwargs = Buildkwargs(*element);
-      *kwargs = pyIntegratorPass(drin, *pyintegrator, *kwargs,
-				 lat.num_particles);
-      /* trackFunction failed */
-      if (!*kwargs) {
-	print_error(elem_index, rout);
-	return false;
-      }
-    } else {
-      *elemdata =
-	(*integrator)(*element, *elemdata, drin, lat.num_particles, &lat.param);
-      /* trackFunction failed */
-      if (!*elemdata) {
-	print_error(elem_index, rout);
-	return false;
-      }
+    *elemdata =
+      (*integrator)(*element, *elemdata, drin, lat.num_particles, &lat.param);
+
+    /* trackFunction failed */
+    if (!*elemdata) {
+      print_error(elem_index, rout);
+      return false;
     }
-    if (lat.losses) {
+    if (lat.losses)
       check_if_lost(drin, lat.num_particles, elem_index, lat.param.nturn,
 		    lat.ixnturn, lat.ixnelem, lat.bxlost, lat.dxlostcoord);
-    } else {
-      setlost(drin, lat.num_particles);
-    }
+    else
+      set_lost(drin, lat.num_particles);
     element++;
     integrator++;
-    pyintegrator++;
     elemdata++;
     kwargs++;
   }
