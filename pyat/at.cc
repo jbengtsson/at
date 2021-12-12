@@ -428,8 +428,8 @@ bool keep_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
   return true;
 }
 
-bool track(lat_type &lat, const npy_uint32 np6, double *drin,
-	   struct parameters &param, const unsigned int num_refpts,
+bool track(lat_type &lat, double *drin,
+	   const unsigned int num_refpts,
 	   const npy_uint32 *refpts, const npy_uint32 losses,
 	   double *&drout, PyObject *rout)
 {
@@ -453,8 +453,9 @@ bool track(lat_type &lat, const npy_uint32 np6, double *drin,
   nextref = (nextrefindex < num_refpts) ? refpts[nextrefindex++] : INT_MAX;
   for (elem_index = 0; elem_index < num_elements; elem_index++) {
     if (elem_index == nextref) {
-      memcpy(drout, drin, np6*sizeof(double));
-      drout += np6; /*  shift the location to write to in the output array */
+      memcpy(drout, drin, lat.np6*sizeof(double));
+      /*  shift the location to write to in the output array */
+      drout += lat.np6;
       nextref = (nextrefindex < num_refpts) ? refpts[nextrefindex++] : INT_MAX;
     }
     /* the actual integrator call */
@@ -469,7 +470,7 @@ bool track(lat_type &lat, const npy_uint32 np6, double *drin,
       }
     } else {
       *elemdata =
-	(*integrator)(*element, *elemdata, drin, lat.num_particles, &param);
+	(*integrator)(*element, *elemdata, drin, lat.num_particles, &lat.param);
       /* trackFunction failed */
       if (!*elemdata) {
 	print_error(elem_index, rout);
@@ -477,7 +478,7 @@ bool track(lat_type &lat, const npy_uint32 np6, double *drin,
       }
     }
     if (losses) {
-      check_if_lost(drin, lat.num_particles, elem_index, param.nturn,
+      check_if_lost(drin, lat.num_particles, elem_index, lat.param.nturn,
 		    lat.ixnturn, lat.ixnelem, lat.bxlost, lat.dxlostcoord);
     } else {
       setlost(drin, lat.num_particles);
@@ -490,8 +491,9 @@ bool track(lat_type &lat, const npy_uint32 np6, double *drin,
   }
   /* the last element in the ring */
   if (num_elements == nextref) {
-    memcpy(drout, drin, np6*sizeof(double));
-    drout += np6; /*  shift the location to write to in the output array */
+    memcpy(drout, drin, lat.np6*sizeof(double));
+    /*  shift the location to write to in the output array */
+    drout += lat.np6;
   }
   return true;
 }
@@ -540,7 +542,6 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     *drout;
   npy_uint32
     omp_num_threads = 0,
-    np6,
     *refpts         = NULL,
     keep_lattice    = 0,
     losses          = 0;
@@ -553,8 +554,6 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     *refs           = NULL;
   PyObject
     *rout;
-  struct parameters
-    param;
   struct LibraryListElement
     *LibraryListPtr;
 
@@ -570,7 +569,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     return NULL;
 
   lat.num_particles = (PyArray_SIZE(rin)/PS_DIM);
-  np6 = lat.num_particles*PS_DIM;
+  lat.np6 = lat.num_particles*PS_DIM;
   drin = static_cast<double*>(PyArray_DATA(rin));
 
   if (refs) {
@@ -611,11 +610,11 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     valid = 0;
   }
 
-  param.RingLength = lattice_length;
-  param.T0         = lattice_length/C0;
+  lat.param.RingLength = lattice_length;
+  lat.param.T0         = lattice_length/C0;
   for (turn = 0; turn < num_turns; turn++) {
-    param.nturn = turn;
-    if (!track(lat, np6, drin, param, num_refpts, refpts, losses, drout, rout))
+    lat.param.nturn = turn;
+    if (!track(lat, drin, num_refpts, refpts, losses, drout, rout))
       return NULL;
   }
   valid = 1;      /* Tracking successful: the lattice can be reused */

@@ -63,13 +63,17 @@ static struct LibraryListElement {
 struct lat_type {
   bool
     *bxlost;
+  unsigned int
+    num_refpts;
   int
     *ixnturn,
     *ixnelem;
   double
     *dxlostcoord;
   npy_uint32
-    num_particles;
+    num_particles,
+    np6,
+    *refpts;
   npy_intp
     pdims[1],
     lxdims[2];
@@ -78,4 +82,6 @@ struct lat_type {
     *xnelem,
     *xlost,
     *xlostcoord;
+  struct parameters
+    param;
 };
