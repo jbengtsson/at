@@ -422,15 +422,14 @@ bool keep_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
     *integrator++ = LibraryListPtr->FunctionHandle;
     *pyintegrator++ = LibraryListPtr->PyFunctionHandle;
     *element++ = el;
-    Py_INCREF(el);     /* Keep a reference to each element in case of reuse */
+    /* Keep a reference to each element in case of reuse */
+    Py_INCREF(el);
     Py_DECREF(PyPassMethod);
   }
   return true;
 }
 
-bool track(lat_type &lat, double *drin,
-	   const npy_uint32 losses,
-	   double *&drout, PyObject *rout)
+bool track(lat_type &lat, double *drin, double *&drout, PyObject *rout)
 {
   unsigned int
     nextrefindex;
@@ -449,13 +448,15 @@ bool track(lat_type &lat, double *drin,
     **kwargs       = kwargs_list;
 
   nextrefindex = 0;
-  nextref = (nextrefindex < lat.num_refpts) ? lat.refpts[nextrefindex++] : INT_MAX;
+  nextref = (nextrefindex < lat.num_refpts)?
+    lat.refpts[nextrefindex++] : INT_MAX;
   for (elem_index = 0; elem_index < num_elements; elem_index++) {
     if (elem_index == nextref) {
       memcpy(drout, drin, lat.np6*sizeof(double));
       /*  shift the location to write to in the output array */
       drout += lat.np6;
-      nextref = (nextrefindex < lat.num_refpts) ? lat.refpts[nextrefindex++] : INT_MAX;
+      nextref = (nextrefindex < lat.num_refpts)?
+	lat.refpts[nextrefindex++] : INT_MAX;
     }
     /* the actual integrator call */
     if (*pyintegrator) {
@@ -476,7 +477,7 @@ bool track(lat_type &lat, double *drin,
 	return false;
       }
     }
-    if (losses) {
+    if (lat.losses) {
       check_if_lost(drin, lat.num_particles, elem_index, lat.param.nturn,
 		    lat.ixnturn, lat.ixnelem, lat.bxlost, lat.dxlostcoord);
     } else {
@@ -536,17 +537,13 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
   double
     *drin,
     *drout;
-  npy_uint32
-    omp_num_threads = 0,
-    keep_lattice    = 0,
-    losses          = 0;
   npy_intp
     outdims[4];
   PyObject
     *lattice;
   PyArrayObject
     *rin,
-    *refs           = NULL;
+    *refs = NULL;
   PyObject
     *rout;
   struct LibraryListElement
@@ -558,9 +555,13 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
   int maxthreads;
 #endif /*_OPENMP*/
 
+  lat.keep_lattice    = 0;
+  lat.losses          = 0;
+  lat.omp_num_threads = 0;
+
   if (!get_input
-      (args, kwargs, lattice, rin, lat.num_turns, refs, keep_lattice,
-       omp_num_threads, losses))
+      (args, kwargs, lattice, rin, lat.num_turns, refs, lat.keep_lattice,
+       lat.omp_num_threads, lat.losses))
     return NULL;
 
   lat.num_particles = (PyArray_SIZE(rin)/PS_DIM);
@@ -587,19 +588,19 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
   rout  = PyArray_EMPTY(4, outdims, NPY_DOUBLE, 1);
   drout = static_cast<double*>(PyArray_DATA((PyArrayObject*)rout));
 
-  if (losses) init_losses(lat);
+  if (lat.losses) init_losses(lat);
 
 #ifdef _OPENMP
-  if ((omp_num_threads > 0) && (num_particles > OMP_PARTICLE_THRESHOLD)) {
+  if ((lat.omp_num_threads > 0) && (num_particles > OMP_PARTICLE_THRESHOLD)) {
     unsigned int nthreads = omp_get_num_procs();
     maxthreads = omp_get_max_threads();
-    if (omp_num_threads < nthreads) nthreads = omp_num_threads;
+    if (lat.omp_num_threads < nthreads) nthreads = lat.omp_num_threads;
     if (num_particles < nthreads) nthreads = num_particles;
     omp_set_num_threads(nthreads);
   }
 #endif /*_OPENMP*/
 
-  if (!(keep_lattice && valid)) {
+  if (!(lat.keep_lattice && valid)) {
     if (!keep_lat(lattice, lattice_length, rout, LibraryListPtr))
       return NULL;
     valid = 0;
@@ -610,17 +611,19 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
 
   for (turn = 0; turn < lat.num_turns; turn++) {
     lat.param.nturn = turn;
-    if (!track(lat, drin, losses, drout, rout)) return NULL;
+    if (!track(lat, drin, drout, rout)) return NULL;
   }
-  valid = 1;      /* Tracking successful: the lattice can be reused */
+
+  /* Tracking successful: the lattice can be reused */
+  valid = 1;
 
 #ifdef _OPENMP
-  if ((omp_num_threads > 0) && (num_particles > OMP_PARTICLE_THRESHOLD)) {
+  if ((lat.omp_num_threads > 0) && (num_particles > OMP_PARTICLE_THRESHOLD)) {
     omp_set_num_threads(maxthreads);
   }
 #endif /*_OPENMP*/
 
-  if (losses) {
+  if (lat.losses) {
     return get_losses(lat, rout);
   } else {
     return rout;

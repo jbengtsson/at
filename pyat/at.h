@@ -74,7 +74,10 @@ struct lat_type {
   npy_uint32
     num_particles,
     np6,
-    *refpts;
+    *refpts,
+    keep_lattice,
+    losses,
+    omp_num_threads;
   npy_intp
     pdims[1],
     lxdims[2];
