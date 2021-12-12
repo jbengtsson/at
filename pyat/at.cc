@@ -429,8 +429,7 @@ bool keep_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
 }
 
 bool track(lat_type &lat, double *drin,
-	   const unsigned int num_refpts,
-	   const npy_uint32 *refpts, const npy_uint32 losses,
+	   const npy_uint32 losses,
 	   double *&drout, PyObject *rout)
 {
   unsigned int
@@ -450,13 +449,13 @@ bool track(lat_type &lat, double *drin,
     **kwargs       = kwargs_list;
 
   nextrefindex = 0;
-  nextref = (nextrefindex < num_refpts) ? refpts[nextrefindex++] : INT_MAX;
+  nextref = (nextrefindex < lat.num_refpts) ? lat.refpts[nextrefindex++] : INT_MAX;
   for (elem_index = 0; elem_index < num_elements; elem_index++) {
     if (elem_index == nextref) {
       memcpy(drout, drin, lat.np6*sizeof(double));
       /*  shift the location to write to in the output array */
       drout += lat.np6;
-      nextref = (nextrefindex < num_refpts) ? refpts[nextrefindex++] : INT_MAX;
+      nextref = (nextrefindex < lat.num_refpts) ? lat.refpts[nextrefindex++] : INT_MAX;
     }
     /* the actual integrator call */
     if (*pyintegrator) {
@@ -532,8 +531,6 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
   static double
     lattice_length = 0e0;
 
-  unsigned int
-    num_refpts;
   int
     turn,
     num_turns;
@@ -542,7 +539,6 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     *drout;
   npy_uint32
     omp_num_threads = 0,
-    *refpts         = NULL,
     keep_lattice    = 0,
     losses          = 0;
   npy_intp
@@ -577,16 +573,16 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
       PyErr_SetString(PyExc_ValueError, "refpts is not a uint32 array");
       return NULL;
     }
-    refpts = static_cast<unsigned int*>(PyArray_DATA(refs));
-    num_refpts = PyArray_SIZE(refs);
+    lat.refpts = static_cast<unsigned int*>(PyArray_DATA(refs));
+    lat.num_refpts = PyArray_SIZE(refs);
   } else {
-    refpts = NULL;
-    num_refpts = 0;
+    lat.refpts = NULL;
+    lat.num_refpts = 0;
   }
 
   outdims[0] = PS_DIM;
   outdims[1] = lat.num_particles;
-  outdims[2] = num_refpts;
+  outdims[2] = lat.num_refpts;
   outdims[3] = num_turns;
 
   rout  = PyArray_EMPTY(4, outdims, NPY_DOUBLE, 1);
@@ -614,7 +610,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
   lat.param.T0         = lattice_length/C0;
   for (turn = 0; turn < num_turns; turn++) {
     lat.param.nturn = turn;
-    if (!track(lat, drin, num_refpts, refpts, losses, drout, rout))
+    if (!track(lat, drin, losses, drout, rout))
       return NULL;
   }
   valid = 1;      /* Tracking successful: the lattice can be reused */
