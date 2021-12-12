@@ -88,14 +88,15 @@ static void setlost(double *drin, npy_uint32 np)
 }
 
 static void
-checkiflost(double *drin, npy_uint32 np, int num_elem, int num_turn,
+checkiflost(double *drin, const npy_uint32 np, const int num_elem,
+	    const int num_turn,
 	    int *xnturn, int *xnelem, bool *xlost, double *xlostcoord)
 {
   unsigned int n, c;
-  for (c=0; c<np; c++) {/* Loop over particles */
+  for (c = 0; c < np; c++) {/* Loop over particles */
     if (!xlost[c]) {  /* No change if already marked */
       double *r6 = drin+c*PS_DIM;
-      for (n=0; n<PS_DIM; n++) {
+      for (n = 0; n < PS_DIM; n++) {
 	if (!isfinite(r6[n]) || ((fabs(r6[n])>LIMIT_AMPLITUDE)&&n<5)) {
 	  xlost[c] = 1;
 	  xnturn[c] = num_turn;
@@ -243,7 +244,6 @@ static struct LibraryListElement* get_track_function(const char *fn_name)
       return NULL;
     }
 
-    // C -> C++.
     LibraryListPtr =
       // (struct LibraryListElement *)
       // malloc(sizeof(struct LibraryListElement));
@@ -273,7 +273,7 @@ static PyObject* Buildkwargs(const PyObject *ElemData)
 }
 
 /* Build input keyword arguments for python integrators */
-static PyObject* Buildargs(double *r_in, int num_particles)
+static PyObject* Buildargs(double *r_in, const int num_particles)
 {
   npy_intp outdims[1];
   PyObject *rin;
@@ -286,10 +286,30 @@ static PyObject* Buildargs(double *r_in, int num_particles)
   return PyTuple_Pack(1, rin);
 }
 
+bool get_input1(PyObject *&args, PyArrayObject *&rin, PyObject *&element)
+{
+  if (!PyArg_ParseTuple(args, "OO!", &element, &PyArray_Type, &rin)) {
+    return false;
+  }
+  if (PyArray_DIM(rin, 0) != PS_DIM) {
+    set_error(PyExc_ValueError, "rin is not 6D");
+    return false;
+  }
+  if (PyArray_TYPE(rin) != NPY_DOUBLE) {
+    set_error(PyExc_ValueError, "rin is not a double array");
+    return false;
+  }
+  if ((PyArray_FLAGS(rin) & NPY_ARRAY_FARRAY_RO) != NPY_ARRAY_FARRAY_RO) {
+    set_error(PyExc_ValueError, "rin is not Fortran-aligned");
+    return false;
+  }
+  return true;
+}
+
 /* Call python integrators */
 static PyObject
 *pyIntegratorPass(double *r_in, PyObject *function, PyObject *kwargs,
-		  int num_particles)
+		  const int num_particles)
 {
   PyObject *args;
 
@@ -318,20 +338,9 @@ static PyObject *at_elempass(PyObject *self, PyObject *args)
   struct LibraryListElement
     *LibraryListPtr;
 
-  if (!PyArg_ParseTuple(args, "OO!", &element,  &PyArray_Type, &rin)) {
-    return NULL;
-  }
-  if (PyArray_DIM(rin, 0) != PS_DIM) {
-    return set_error(PyExc_ValueError, "rin is not 6D");
-  }
-  if (PyArray_TYPE(rin) != NPY_DOUBLE) {
-    return set_error(PyExc_ValueError, "rin is not a double array");
-  }
-  if ((PyArray_FLAGS(rin) & NPY_ARRAY_FARRAY_RO) != NPY_ARRAY_FARRAY_RO) {
-    return set_error(PyExc_ValueError, "rin is not Fortran-aligned");
-  }
+  if (!get_input1(args, rin, element)) return NULL;
+
   num_particles = (PyArray_SIZE(rin)/PS_DIM);
-  // C -> C++.
   drin = static_cast<double*>(PyArray_DATA(rin));
 
   param.RingLength = 0.0;
@@ -362,10 +371,10 @@ static PyObject *at_elempass(PyObject *self, PyObject *args)
 }
 
 
-bool get_input(PyObject *args, PyObject *kwargs,
-	       PyObject *&lattice, PyArrayObject *&rin, int &num_turns,
-	       PyArrayObject *&refs, npy_uint32 &keep_lattice,
-	       npy_uint32 &omp_num_threads, npy_uint32 &losses)
+bool get_input2(PyObject *args, PyObject *kwargs,
+		PyObject *&lattice, PyArrayObject *&rin, int &num_turns,
+		PyArrayObject *&refs, npy_uint32 &keep_lattice,
+		npy_uint32 &omp_num_threads, npy_uint32 &losses)
 {
   static char
     *kwlist[] =
@@ -394,7 +403,7 @@ bool get_input(PyObject *args, PyObject *kwargs,
   return true;
 }
 
-void loss_init(const npy_uint32 num_particles, npy_intp pdims[],
+void init_loss(const npy_uint32 num_particles, npy_intp pdims[],
 	       npy_intp lxdims[], int *ixnturn, PyObject *xnturn, int *ixnelem,
 	       PyObject *xnelem, bool *bxlost, PyObject *xlost,
 	       double *dxlostcoord, PyObject *xlostcoord)
@@ -423,6 +432,169 @@ void loss_init(const npy_uint32 num_particles, npy_intp pdims[],
   }
 }
 
+bool keep_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
+	      LibraryListElement *&LibraryListPtr)
+{
+  npy_uint32     elem_index;
+  PyObject       **element;
+  track_function *integrator;
+  PyObject       **pyintegrator;
+
+  /* Release the stored elements */
+  for (elem_index = 0; elem_index < num_elements; elem_index++) {
+    free(elemdata_list[elem_index]);
+    /* Release the stored elements, may be NULL if */
+    Py_XDECREF(element_list[elem_index]);
+  }                          /* a previous call was interrupted by an error */
+  num_elements = PyList_Size(lattice);
+
+  /* Pointer to Element structures used by the tracking function */
+  free(elemdata_list);
+  elemdata_list =
+    (union elem **)calloc(num_elements, sizeof(union elem *));
+
+  /* Pointer to Element list, make sure all pointers are initially NULL */
+  free(element_list);
+  element_list = (PyObject **)calloc(num_elements, sizeof(PyObject *));
+
+  /* pointer to the list of C integrators */
+  integrator_list =
+    (track_function *)realloc(integrator_list,
+			      num_elements*sizeof(track_function));
+
+  /* pointer to the list of python integrators, make sure all pointers are
+     initially NULL */
+  free(pyintegrator_list);
+  pyintegrator_list = (PyObject **)calloc(num_elements, sizeof(PyObject *));
+
+  /* pointer to the list of python integrators kwargs, make sure all pointers
+     are initially NULL */
+  free(kwargs_list);
+  kwargs_list = (PyObject **)calloc(num_elements, sizeof(PyObject *));
+
+  lattice_length = 0e0;
+  element = element_list;
+  integrator = integrator_list;
+  pyintegrator = pyintegrator_list;
+  for (elem_index = 0; elem_index < num_elements; elem_index++) {
+    PyObject *el           = PyList_GET_ITEM(lattice, elem_index);
+    PyObject *PyPassMethod = PyObject_GetAttrString(el, "PassMethod");
+    double   length;
+
+    if (!PyPassMethod) {
+      /* No PassMethod */
+      print_error(elem_index, rout);
+      return false;
+    }
+    LibraryListPtr = get_track_function(PyUnicode_AsUTF8(PyPassMethod));
+    if (!LibraryListPtr) {
+      /* No trackFunction for the given PassMethod */
+      print_error(elem_index, rout);
+      return false;
+    }
+    length = PyFloat_AsDouble(PyObject_GetAttrString(el, "Length"));
+    if (PyErr_Occurred())
+      PyErr_Clear();
+    else
+      lattice_length += length;
+    *integrator++ = LibraryListPtr->FunctionHandle;
+    *pyintegrator++ = LibraryListPtr->PyFunctionHandle;
+    *element++ = el;
+    Py_INCREF(el);     /* Keep a reference to each element in case of reuse */
+    Py_DECREF(PyPassMethod);
+  }
+  return true;
+}
+
+bool track(const npy_uint32 num_particles, const npy_uint32 np6,
+	   double *drin, struct parameters &param,
+	   const unsigned int num_refpts, const npy_uint32 *refpts,
+	   const npy_uint32 losses, double *&drout, PyObject *rout,
+	   int *ixnturn, int *ixnelem, bool *bxlost, double *dxlostcoord)
+{
+  unsigned int
+    nextrefindex;
+  union elem
+    **elemdata     = elemdata_list;
+  npy_uint32
+    elem_index,
+    nextref;
+  PyObject
+    **element      = element_list;
+  track_function
+    *integrator    = integrator_list;
+  PyObject
+    **pyintegrator = pyintegrator_list;
+  PyObject
+    **kwargs       = kwargs_list;
+
+  nextrefindex = 0;
+  nextref = (nextrefindex < num_refpts) ? refpts[nextrefindex++] : INT_MAX;
+  for (elem_index = 0; elem_index < num_elements; elem_index++) {
+    if (elem_index == nextref) {
+      memcpy(drout, drin, np6*sizeof(double));
+      drout += np6; /*  shift the location to write to in the output array */
+      nextref = (nextrefindex < num_refpts) ? refpts[nextrefindex++] : INT_MAX;
+    }
+    /* the actual integrator call */
+    if (*pyintegrator) {
+      if (!*kwargs) *kwargs = Buildkwargs(*element);
+      *kwargs = pyIntegratorPass(drin, *pyintegrator, *kwargs, num_particles);
+      /* trackFunction failed */
+      if (!*kwargs) {
+	print_error(elem_index, rout);
+	return false;
+      }
+    } else {
+      *elemdata =
+	(*integrator)(*element, *elemdata, drin, num_particles, &param);
+      /* trackFunction failed */
+      if (!*elemdata) {
+	print_error(elem_index, rout);
+	return false;
+      }
+    }
+    if (losses) {
+      checkiflost(drin, num_particles, elem_index, param.nturn,
+		  ixnturn, ixnelem, bxlost, dxlostcoord);
+    } else {
+      setlost(drin, num_particles);
+    }
+    element++;
+    integrator++;
+    pyintegrator++;
+    elemdata++;
+    kwargs++;
+  }
+  /* the last element in the ring */
+  if (num_elements == nextref) {
+    memcpy(drout, drin, np6*sizeof(double));
+    drout += np6; /*  shift the location to write to in the output array */
+  }
+  return true;
+}
+
+PyObject* get_loss(PyObject *xlost, PyObject *xnturn, PyObject *xnelem,
+		   PyObject *xlostcoord, PyObject *rout)
+{
+  PyObject
+    *tout = PyTuple_New(2),
+    *dict = PyDict_New();
+
+  PyDict_SetItemString(dict, (char *)"islost", (PyObject *)xlost);
+  PyDict_SetItemString(dict, (char *)"turn",   (PyObject *)xnturn);
+  PyDict_SetItemString(dict, (char *)"elem",   (PyObject *)xnelem);
+  PyDict_SetItemString(dict, (char *)"coord",  (PyObject *)xlostcoord);
+  PyTuple_SetItem(tout,  0,  rout);
+  PyTuple_SetItem(tout,  1,  dict);
+  Py_DECREF(xlost);
+  Py_DECREF(xnturn);
+  Py_DECREF(xnelem);
+  Py_DECREF(xlostcoord);
+
+  return tout;
+}
+
 /* Parse the arguments to atpass, set things up, and execute.
    Arguments:
      line:   sequence of elements
@@ -440,7 +612,6 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
   bool
     *bxlost         = NULL;
   unsigned int
-    nextrefindex,
     num_refpts;
   int
     turn,
@@ -455,9 +626,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     omp_num_threads = 0,
     num_particles,
     np6,
-    elem_index,
     *refpts         = NULL,
-    nextref,
     keep_lattice    = 0,
     losses          = 0;
   npy_intp
@@ -484,7 +653,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
   int maxthreads;
 #endif /*_OPENMP*/
 
-  if (!get_input
+  if (!get_input2
       (args, kwargs,
        lattice, rin, num_turns, refs, keep_lattice, omp_num_threads, losses))
     return NULL;
@@ -513,7 +682,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
   rout  = PyArray_EMPTY(4, outdims, NPY_DOUBLE, 1);
   drout = static_cast<double*>(PyArray_DATA((PyArrayObject*)rout));
 
-  if (losses) loss_init(num_particles, pdims, lxdims, ixnturn, xnturn, ixnelem,
+  if (losses) init_loss(num_particles, pdims, lxdims, ixnturn, xnturn, ixnelem,
 			xnelem, bxlost, xlost, dxlostcoord, xlostcoord);
 
 #ifdef _OPENMP
@@ -527,120 +696,18 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
 #endif /*_OPENMP*/
 
   if (!(keep_lattice && valid)) {
-    PyObject       **element;
-    track_function *integrator;
-    PyObject       **pyintegrator;
-
-    /* Release the stored elements */
-    for (elem_index=0; elem_index < num_elements; elem_index++) {
-      free(elemdata_list[elem_index]);
-      /* Release the stored elements, may be NULL if */
-      Py_XDECREF(element_list[elem_index]);
-    }                          /* a previous call was interrupted by an error */
-    num_elements = PyList_Size(lattice);
-
-    /* Pointer to Element structures used by the tracking function */
-    free(elemdata_list);
-    elemdata_list =
-      (union elem **)calloc(num_elements, sizeof(union elem *));
-
-    /* Pointer to Element list, make sure all pointers are initially NULL */
-    free(element_list);
-    element_list = (PyObject **)calloc(num_elements, sizeof(PyObject *));
-
-    /* pointer to the list of C integrators */
-    integrator_list =
-      (track_function *)realloc(integrator_list,
-				num_elements*sizeof(track_function));
-
-    /* pointer to the list of python integrators, make sure all pointers are
-       initially NULL */
-    free(pyintegrator_list);
-    pyintegrator_list = (PyObject **)calloc(num_elements, sizeof(PyObject *));
-
-    /* pointer to the list of python integrators kwargs, make sure all pointers
-       are initially NULL */
-    free(kwargs_list);
-    kwargs_list = (PyObject **)calloc(num_elements, sizeof(PyObject *));
-
-    lattice_length = 0.0;
-    element = element_list;
-    integrator = integrator_list;
-    pyintegrator = pyintegrator_list;
-    for (elem_index = 0; elem_index < num_elements; elem_index++) {
-      PyObject *el           = PyList_GET_ITEM(lattice, elem_index);
-      PyObject *PyPassMethod = PyObject_GetAttrString(el, "PassMethod");
-      double   length;
-
-      if (!PyPassMethod)
-	/* No PassMethod */
-	return print_error(elem_index, rout);
-      LibraryListPtr = get_track_function(PyUnicode_AsUTF8(PyPassMethod));
-      if (!LibraryListPtr) {
-	/* No trackFunction for the given PassMethod */
-	return print_error(elem_index, rout);
-      }
-      length = PyFloat_AsDouble(PyObject_GetAttrString(el, "Length"));
-      if (PyErr_Occurred())
-	PyErr_Clear();
-      else
-	lattice_length += length;
-      *integrator++ = LibraryListPtr->FunctionHandle;
-      *pyintegrator++ = LibraryListPtr->PyFunctionHandle;
-      *element++ = el;
-      Py_INCREF(el);     /* Keep a reference to each element in case of reuse */
-      Py_DECREF(PyPassMethod);
-    }
+    if (!keep_lat(lattice, lattice_length, rout, LibraryListPtr))
+      return NULL;
     valid = 0;
   }
 
   param.RingLength = lattice_length;
   param.T0         = lattice_length/C0;
   for (turn = 0; turn < num_turns; turn++) {
-    PyObject       **element      = element_list;
-    track_function *integrator    = integrator_list;
-    PyObject       **pyintegrator = pyintegrator_list;
-    PyObject       **kwargs       = kwargs_list;
-    union elem     **elemdata     = elemdata_list;
-
-    param.nturn  = turn;
-    nextrefindex = 0;
-    nextref = (nextrefindex < num_refpts) ? refpts[nextrefindex++] : INT_MAX;
-    for (elem_index = 0; elem_index < num_elements; elem_index++) {
-      if (elem_index == nextref) {
-	memcpy(drout, drin, np6*sizeof(double));
-	drout += np6; /*  shift the location to write to in the output array */
-	nextref = (nextrefindex<num_refpts) ? refpts[nextrefindex++] : INT_MAX;
-      }
-      /* the actual integrator call */
-      if (*pyintegrator) {
-	if (!*kwargs) *kwargs = Buildkwargs(*element);
-	*kwargs = pyIntegratorPass(drin, *pyintegrator, *kwargs, num_particles);
-	/* trackFunction failed */
-	if (!*kwargs) return print_error(elem_index, rout);
-      } else {
-	*elemdata =
-	  (*integrator)(*element, *elemdata, drin, num_particles, &param);
-	/* trackFunction failed */
-	if (!*elemdata) return print_error(elem_index, rout);
-      }
-      if (losses) {
-	checkiflost(drin, num_particles, elem_index, turn, ixnturn, ixnelem,
-		    bxlost, dxlostcoord);
-      } else {
-	setlost(drin, num_particles);
-      }
-      element++;
-      integrator++;
-      pyintegrator++;
-      elemdata++;
-      kwargs++;
-    }
-    /* the last element in the ring */
-    if (num_elements == nextref) {
-      memcpy(drout, drin, np6*sizeof(double));
-      drout += np6; /*  shift the location to write to in the output array */
-    }
+    param.nturn = turn;
+    if (!track(num_particles, np6, drin, param, num_refpts, refpts, losses,
+	       drout, rout, ixnturn, ixnelem, bxlost, dxlostcoord))
+      return NULL;
   }
   valid = 1;      /* Tracking successful: the lattice can be reused */
 
@@ -651,22 +718,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
 #endif /*_OPENMP*/
 
   if (losses) {
-    PyObject
-      *tout = PyTuple_New(2),
-      *dict = PyDict_New();
-
-    PyDict_SetItemString(dict, (char *)"islost", (PyObject *)xlost);
-    PyDict_SetItemString(dict, (char *)"turn", (PyObject *)xnturn); 
-    PyDict_SetItemString(dict, (char *)"elem", (PyObject *)xnelem);
-    PyDict_SetItemString(dict, (char *)"coord", (PyObject *)xlostcoord);
-    PyTuple_SetItem(tout,  0,  rout);  
-    PyTuple_SetItem(tout,  1,  dict);
-    Py_DECREF(xlost);
-    Py_DECREF(xnturn);
-    Py_DECREF(xnelem);
-    Py_DECREF(xlostcoord);
-
-    return tout;          
+    return get_loss(xlost, xnturn, xnelem, xlostcoord, rout);
   } else {
     return rout;
   }
