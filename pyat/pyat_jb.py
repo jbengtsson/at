@@ -11,7 +11,7 @@ plt.rcParams["figure.figsize"] = (9.0, 6.0)
 def printf(format, *args): sys.stdout.write(format % args)
 
 
-def prt_ps(str, ps):
+def prt_vec(str, ps):
     print(str, end='')
     for x in ps:
         print('{:11.3e}'.format(x), end='')
@@ -66,13 +66,13 @@ def example(ring):
 
     if not False:
         ps = np.array([1e-3, -1e-3, 0e0, 0e0, 0e0, 0e0])
-        prt_ps('\nTrack one turn:\n', ps)
+        prt_vec('\nTrack one turn:\n', ps)
         at.lattice_pass(lat, ps, 1)
-        prt_ps('', ps)
+        prt_vec('', ps)
 
     if False:
         [cod, _] = at.find_orbit(lat, dp=0e0)
-        prt_ps('\nFixed point:\n', cod)
+        prt_vec('\nFixed point:\n', cod)
 
     if False:
         [elemdata0, beamdata, elemdata] = \
@@ -129,14 +129,14 @@ def tst_cases(lat):
         atpass(lat, ps, 1)
         exit(0)
 
-    if False:
+    if not False:
         # test_quad.
         q = elements.Quadrupole('quad', 0.4, k=1)
         lattice = [q]
-        ps = numpy.array(numpy.zeros((6, 1)), order='F')
-        ps[0, 0] = 1e-6
+        ps = numpy.array(numpy.zeros((6)), order='F')
+        ps[0] = 1e-6
         atpass(lat, ps, 1)
-        print('\n', ps)
+        prt_vec('\n', ps)
         exit(0)
 
     if False:
@@ -199,7 +199,7 @@ def tst_cases(lat):
                 prt_mat('\n', Ms[k,:,:])
 
         [orbit, _] = at.find_orbit4(lat, dp=0e0)
-        prt_ps('\norbit: ', orbit)
+        prt_vec('\norbit: ', orbit)
 
         ld02, rd2, ld2 = at.linopt2(lat, ref_pts, get_w=True)
         print('\nlinopt2:\n', ld02)
@@ -235,7 +235,7 @@ if False:
 
 lat.radiation_off()
 
-if False:
+if not False:
     tst_cases(lat)
     exit(0)
 

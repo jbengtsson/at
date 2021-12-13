@@ -52,34 +52,6 @@ static PyObject* get_ext_suffix(void)
   return ext_suffix;
 }
 
-/* Import the python module for python integrators and return the function
-   object                                                                     */
-static PyObject* GetpyFunction(const char *fn_name)
-{
-  char     dest[300];
-  PyObject *pModule;
-
-  strcpy(dest, "at.integrators.");
-  strcat(dest, fn_name);
-
-  pModule = PyImport_ImportModule(fn_name);
-  if (!pModule){
-    PyErr_Clear();
-    pModule = PyImport_ImportModule(dest);
-  }
-  if(!pModule) return NULL;
-  PyObject* pyfunction = PyObject_GetAttrString(pModule, "trackFunction");
-  if ((!pyfunction) || !PyCallable_Check(pyfunction)) {
-    Py_DECREF(pModule);
-    if (pyfunction) {
-      Py_DECREF(pyfunction);
-    }
-    return NULL;
-  }
-  Py_DECREF(pModule);
-  return pyfunction;
-}
-
 static PyObject *isopenmp(PyObject *self)
 {
 #ifdef _OPENMP
@@ -97,42 +69,55 @@ static PyObject *isopenmp(PyObject *self)
 static struct LibraryListElement*
 SearchLibraryList(struct LibraryListElement *head, const char *method_name)
 {
-  if (head) {
-    printf("\nSearchLibraryList: %s\n", method_name);
+  if (head)
     return (strcmp(head->MethodName, method_name) == 0)?
       head : SearchLibraryList(head->Next, method_name);
-  } else
+  else
     return NULL;
 }
 
 /* Find the correct track function by name. */
-static struct LibraryListElement* get_track_function(const char *fn_name)
+static struct LibraryListElement* get_track_func(const char *fn_name)
 {
+  static char
+    *int_list[] =
+    {(char*)"CorrectorPass",
+     (char*)"IdentityPass",
+     (char*)"AperturePass",
+     (char*)"DriftPass",
+     (char*)"StrMPoleSymplectic4Pass", (char*)"StrMPoleSymplectic4RadPass",
+     (char*)"BndMPoleSymplectic4Pass", (char*)"BndMPoleSymplectic4RadPass",
+     (char*)"BndMPoleSymplectic4E2Pass",
+     (char*)"BndStrMPoleSymplectic4Pass",
+     (char*)"CavityPass",
+     (char*)"GWigSymplecticPass", (char*)"GWigSymplecticRadPass",
+     (char*)"Matrix66Pass",
+     (char*)"ExactHamiltonianPass", };
+
+  char
+    lib_file[300],
+    buffer[200];
+  track_function
+    fn_handle = NULL;
+  LIBRARYHANDLETYPE
+    dl_handle = NULL;
+  PyObject
+    *pyfunction = NULL;
   struct LibraryListElement
     *LibraryListPtr = SearchLibraryList(LibraryList, fn_name);
 
   if (!LibraryListPtr) {
-    LIBRARYHANDLETYPE dl_handle=NULL;
-    track_function    fn_handle = NULL;
-    char              lib_file[300], buffer[200];
-    PyObject          *pyfunction = NULL;
+    snprintf(lib_file, sizeof(lib_file), integrator_path, fn_name);
+    printf("\nget_track_func: %s\n", lib_file);
+    dl_handle = LOADLIBFCN(lib_file);
+    if (dl_handle) fn_handle = (track_function)GETTRACKFCN(dl_handle);
 
-    pyfunction = GetpyFunction(fn_name);
-
-    if(!pyfunction){
-      snprintf(lib_file, sizeof(lib_file), integrator_path, fn_name);
-      dl_handle = LOADLIBFCN(lib_file);
-      if (dl_handle) {
-	fn_handle = (track_function)GETTRACKFCN(dl_handle);
-      }
-    }
-        
-    if((fn_handle==NULL) && (pyfunction==NULL)){
+    if ((fn_handle == NULL) && (pyfunction == NULL)) {
       snprintf(buffer, sizeof(buffer),
 	       "PassMethod %s: library, module or trackFunction not found",
 	       fn_name);
-      if(dl_handle) FREELIBFCN(dl_handle);
-      if(pyfunction) Py_DECREF(pyfunction);
+      if (dl_handle) FREELIBFCN(dl_handle);
+      if (pyfunction) Py_DECREF(pyfunction);
       PyErr_SetString(PyExc_RuntimeError, buffer);
       return NULL;
     }
@@ -217,7 +202,7 @@ static PyObject *at_elempass(PyObject *self, PyObject *args)
 
   PyPassMethod = PyObject_GetAttrString(element, "PassMethod");
   if (!PyPassMethod) return NULL;
-  LibraryListPtr = get_track_function(PyUnicode_AsUTF8(PyPassMethod));
+  LibraryListPtr = get_track_func(PyUnicode_AsUTF8(PyPassMethod));
   Py_DECREF(PyPassMethod);
   integrator = LibraryListPtr->FunctionHandle;
 
@@ -288,8 +273,8 @@ void init_losses(lat_type &lat)
   }
 }
 
-bool keep_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
-	      LibraryListElement *&LibraryListPtr)
+bool get_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
+	     LibraryListElement *&LibraryListPtr)
 {
   npy_uint32     elem_index;
   PyObject       **element;
@@ -334,7 +319,7 @@ bool keep_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
       return false;
     }
 
-    LibraryListPtr = get_track_function(PyUnicode_AsUTF8(PyPassMethod));
+    LibraryListPtr = get_track_func(PyUnicode_AsUTF8(PyPassMethod));
     if (!LibraryListPtr) {
       /* No trackFunction for the given PassMethod */
       print_error(elem_index, rout);
@@ -492,8 +477,8 @@ PyObject* get_losses(lat_type &lat, PyObject *rout)
      reuse:  whether to reuse the cached state of the ring                    */
 
 static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
-  static int
-    valid = 0;
+  static bool
+    valid = false;
   static double
     lattice_length = 0e0;
 
@@ -566,9 +551,8 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
 #endif /*_OPENMP*/
 
   if (!(lat.keep_lattice && valid)) {
-    if (!keep_lat(lattice, lattice_length, rout, LibraryListPtr))
-      return NULL;
-    valid = 0;
+    if (!get_lat(lattice, lattice_length, rout, LibraryListPtr)) return NULL;
+    valid = false;
   }
 
   lat.param.RingLength = lattice_length;
@@ -580,7 +564,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
   }
 
   /* Tracking successful: the lattice can be reused */
-  valid = 1;
+  valid = true;
 
 #ifdef _OPENMP
   if ((lat.omp_num_threads > 0) && (num_particles > OMP_PARTICLE_THRESHOLD)) {

@@ -71,16 +71,17 @@ enum element_type
 enum elem_kind
   {
    corr_ = 0,
-   id_,
-   ap_,
+   ident_,
+   aper_,
    drift_,
-   mpole_,
+   mpole_, mpole_rad_,
+   bend_, bend_rad_,
+   bend_exact,
    cbend_,
-   mpole_exact,
    cav_,
-   wig_,
+   wig_, wig_rad,
    M66_,
-   H_
+   H_exact
   };
 
 enum MpoleKind
