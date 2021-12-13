@@ -218,8 +218,8 @@ lat_names = {
 }
 
 # lat_name = 'dba'
-lat_name = 'hmba'
-# lat_name = 'bessy-iii'
+# lat_name = 'hmba'
+lat_name = 'bessy-iii'
 if lat_name != 'bessy-iii':
     lat = at.load_mat(lat_names[lat_name])
 else:
@@ -234,7 +234,7 @@ if False:
 
 lat.radiation_off()
 
-if not False:
+if False:
     tst_cases(lat)
     exit(0)
 

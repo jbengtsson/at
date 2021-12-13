@@ -57,7 +57,7 @@ struct parameters {
 };
 
 static struct LibraryListElement {
-  const char                *MethodName;
+  std::string               MethodName;
   void                      *LibraryHandle;
   track_function            FunctionHandle;
   struct LibraryListElement *Next;

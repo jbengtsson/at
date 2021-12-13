@@ -7,12 +7,18 @@
 #include "at.h"
 
 
-static npy_uint32     num_elements         = 0;
-static union elem     **elemdata_list      = NULL;
-static PyObject       **element_list       = NULL;
-static track_function *integrator_list     = NULL;
-static PyObject       **kwargs_list        = NULL;
-static char           integrator_path[300];
+static npy_uint32
+  num_elements         = 0;
+static union elem
+  **elemdata_list      = NULL;
+static PyObject
+  **element_list       = NULL,
+  **kwargs_list        = NULL;
+static track_function
+  *integrator_list     = NULL;
+static std::string
+  integrator_path,
+  integrator_lib;
 
 
 //------------------------------------------------------------------------------
@@ -69,52 +75,23 @@ static PyObject *isopenmp(PyObject *self)
    method_name is already loaded. If it is - return the pointer to the
    list element. If not, return NULL.                                         */
 static struct LibraryListElement*
-SearchLibraryList(struct LibraryListElement *head, const char *method_name)
+SearchLibraryList(struct LibraryListElement *head,
+		  const std::string &method_name)
 {
   if (head)
     return
-      (strcmp(head->MethodName, method_name) == 0)?
+      (head->MethodName == method_name)?
       head : SearchLibraryList(head->Next, method_name);
   else
     return NULL;
 }
 
 /* Find the correct track function by name. */
-static struct LibraryListElement* get_track_func(const char *fn_name)
+static struct LibraryListElement* get_track_func(const std::string &fn_name)
 {
-  static char
-    *int_names[] =
-    {(char*)"CorrectorPass",
-     (char*)"IdentityPass",
-     (char*)"AperturePass",
-     (char*)"DriftPass",
-     (char*)"StrMPoleSymplectic4Pass", (char*)"StrMPoleSymplectic4RadPass",
-     (char*)"BndMPoleSymplectic4Pass", (char*)"BndMPoleSymplectic4RadPass",
-     (char*)"BndMPoleSymplectic4E2Pass",
-     (char*)"BndStrMPoleSymplectic4Pass",
-     (char*)"CavityPass",
-     (char*)"GWigSymplecticPass", (char*)"GWigSymplecticRadPass",
-     (char*)"Matrix66Pass",
-     (char*)"ExactHamiltonianPass" };
-
-  static char
-    *int_[] =
-    {(char*)"trackFunction",
-     (char*)"trackFunction",
-     (char*)"trackFunction",
-     (char*)"trackFunction",
-     (char*)"trackFunction", (char*)"trackFunction",
-     (char*)"trackFunction", (char*)"trackFunction",
-     (char*)"trackFunction",
-     (char*)"trackFunction",
-     (char*)"trackFunction",
-     (char*)"trackFunction", (char*)"trackFunction",
-     (char*)"trackFunction",
-     (char*)"trackFunction" };
-
-  char
-    lib_file[300] = "",
-    buffer[200];
+  std::string
+    lib_file = "",
+    buffer;
   track_function
     fn_handle = NULL;
   void
@@ -123,27 +100,58 @@ static struct LibraryListElement* get_track_func(const char *fn_name)
     *LibraryListPtr = SearchLibraryList(LibraryList, fn_name);
 
   if (!LibraryListPtr) {
-    snprintf(lib_file, sizeof(lib_file), integrator_path, fn_name);
-    dl_handle = dlopen(lib_file, RTLD_LAZY);
-    if (dl_handle)
-      fn_handle = (track_function)dlsym(dl_handle, "trackFunction");
+#if 0
+    lib_file = integrator_path+"/"+fn_name+integrator_lib;
+#else
+    lib_file = integrator_path+"/"+"ElemPass"+integrator_lib;
+#endif
 
-    printf("\nget_track_func:\n  %s\n  %s\n  %p\n  %p\n",
-	   fn_name, lib_file, dl_handle, fn_handle);
+    dl_handle = dlopen(lib_file.c_str(), RTLD_LAZY);
+    if (dl_handle) {
+           if (fn_name == "CorrectorPass")
+	fn_handle = (track_function)dlsym(dl_handle, "corr_pass");
+      else if (fn_name == "IdentityPass")
+	fn_handle = (track_function)dlsym(dl_handle, "id_pass");
+      else if (fn_name == "AperturePass")
+	fn_handle = (track_function)dlsym(dl_handle, "aper_pass");
+      else if (fn_name == "DriftPass")
+	fn_handle = (track_function)dlsym(dl_handle, "drift_pass");
+      else if (fn_name == "StrMPoleSymplectic4Pass")
+	fn_handle = (track_function)dlsym(dl_handle, "mpole_pass");
+      else if (fn_name == "StrMPoleSymplectic4RadPass")
+	fn_handle = (track_function)dlsym(dl_handle, "mpole_rad_pass");
+      else if (fn_name == "BndMPoleSymplectic4Pass")
+	fn_handle = (track_function)dlsym(dl_handle, "bend_pass");
+      else if (fn_name == "BndMPoleSymplectic4RadPass")
+	fn_handle = (track_function)dlsym(dl_handle, "bend_rad_pass");
+      else if (fn_name == "BndMPoleSymplectic4E2Pass")
+	fn_handle = (track_function)dlsym(dl_handle, "bend_exact_pass");
+      else if (fn_name == "BndStrMPoleSymplectic4Pass")
+	fn_handle = (track_function)dlsym(dl_handle, "cbend_pass");
+      else if (fn_name == "CavityPass")
+	fn_handle = (track_function)dlsym(dl_handle, "cav_pass");
+      else if (fn_name == "GWigSymplecticPass")
+	fn_handle = (track_function)dlsym(dl_handle, "wig_pass");
+      else if (fn_name == "GWigSymplecticRadPass")
+	fn_handle = (track_function)dlsym(dl_handle, "wig_rad_pass");
+      else if (fn_name == "Matrix66Pass")
+	fn_handle = (track_function)dlsym(dl_handle, "M66_pass");
+      else if (fn_name == "ExactHamiltonianPass")
+	fn_handle = (track_function)dlsym(dl_handle, "H_exact_pass");
+    }
+
     if (fn_handle == NULL) {
-      snprintf(buffer, sizeof(buffer),
-	       "PassMethod %s: library, module or trackFunction not found",
-	       fn_name);
+      buffer =
+	"PassMethod "+fn_name+": library, module or trackFunction not found";
       if (dl_handle) dlclose(dl_handle);
-      PyErr_SetString(PyExc_RuntimeError, buffer);
+      PyErr_SetString(PyExc_RuntimeError, buffer.c_str());
       return NULL;
     }
 
     LibraryListPtr                 =
       static_cast<struct LibraryListElement*>
       (malloc(sizeof(struct LibraryListElement)));
-    LibraryListPtr->MethodName     =
-      strcpy(static_cast<char*>(malloc(strlen(fn_name)+1)), fn_name);
+    LibraryListPtr->MethodName     = fn_name;
     LibraryListPtr->LibraryHandle  = dl_handle;
     LibraryListPtr->FunctionHandle = fn_handle;
     LibraryListPtr->Next           = LibraryList;
@@ -662,10 +670,10 @@ PyMODINIT_FUNC PyInit_atpass(void)
   ext_suffix_obj = get_ext_suffix();
   if (ext_suffix_obj == NULL) return NULL;
   ext_suffix =
-    (ext_suffix_obj == Py_None) ? ".so" : PyUnicode_AsUTF8(ext_suffix_obj);
+    (ext_suffix_obj == Py_None)? ".so" : PyUnicode_AsUTF8(ext_suffix_obj);
   integ_path = PyUnicode_AsUTF8(integ_path_obj);
-  snprintf(integrator_path, sizeof(integrator_path), "%s%s%%s%s", integ_path,
-	   "/", ext_suffix);
+  integrator_path = integ_path;
+  integrator_lib = ext_suffix;
   Py_DECREF(integ_path_obj);
   Py_DECREF(ext_suffix_obj);
 
