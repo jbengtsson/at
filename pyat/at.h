@@ -1,14 +1,16 @@
 #define  PY_SSIZE_T_CLEAN
+
 #include <Python.h>
 #include <stdarg.h>
 #ifdef _OPENMP
-  #include <string.h>
-  #include <omp.h>
+  #include <omp>
 #endif /*_OPENMP*/
 #include <stdbool.h> 
 #include <math.h>
 #include <float.h>
 #include <dlfcn.h>
+
+#include <string>
 
 #define  NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/ndarrayobject.h>
