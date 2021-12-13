@@ -8,6 +8,7 @@
 #include <stdbool.h> 
 #include <math.h>
 #include <float.h>
+#include <dlfcn.h>
 
 #define  NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/ndarrayobject.h>
@@ -16,6 +17,8 @@
 #define NUMPY_IMPORT_ARRAY_TYPE void *
 
 #define ATPY_PASS "trackFunction"
+
+#if 0
 
 #if defined(PCWIN) || defined(PCWIN64) || defined(_WIN32)
   #include <windows.h>
@@ -35,6 +38,8 @@
   #define OBJECTEXT ".so"
 #endif
 
+#endif
+
 #define LIMIT_AMPLITUDE 1
 
   
@@ -51,7 +56,7 @@ struct parameters {
 
 static struct LibraryListElement {
   const char                *MethodName;
-  LIBRARYHANDLETYPE         LibraryHandle;
+  void                      *LibraryHandle;
   track_function            FunctionHandle;
   struct LibraryListElement *Next;
 } *LibraryList = NULL;

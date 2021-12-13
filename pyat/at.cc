@@ -114,22 +114,22 @@ static struct LibraryListElement* get_track_func(const char *fn_name)
     buffer[200];
   track_function
     fn_handle = NULL;
-  LIBRARYHANDLETYPE
-    dl_handle = NULL;
+  void
+    *dl_handle = NULL;
   struct LibraryListElement
     *LibraryListPtr = SearchLibraryList(LibraryList, fn_name);
 
   if (!LibraryListPtr) {
     snprintf(lib_file, sizeof(lib_file), integrator_path, fn_name);
-    printf("\nget_track_func: %s\n", lib_file);
-    dl_handle = LOADLIBFCN(lib_file);
-    if (dl_handle) fn_handle = (track_function)GETTRACKFCN(dl_handle);
+    dl_handle = dlopen(lib_file, RTLD_LAZY);
+    if (dl_handle)
+      fn_handle = (track_function)dlsym(dl_handle, "trackFunction");
 
     if (fn_handle == NULL) {
       snprintf(buffer, sizeof(buffer),
 	       "PassMethod %s: library, module or trackFunction not found",
 	       fn_name);
-      if (dl_handle) FREELIBFCN(dl_handle);
+      if (dl_handle) dlclose(dl_handle);
       PyErr_SetString(PyExc_RuntimeError, buffer);
       return NULL;
     }
@@ -144,6 +144,10 @@ static struct LibraryListElement* get_track_func(const char *fn_name)
     LibraryListPtr->Next = LibraryList;
     LibraryList = LibraryListPtr;
   }
+  printf("\nget_track_func:\n  %s\n  %s\n  %p\n  %p\n",
+	 lib_file,
+	 LibraryListPtr->MethodName, LibraryListPtr->LibraryHandle,
+	 LibraryListPtr->FunctionHandle);
   return LibraryListPtr;
 }
 
@@ -418,10 +422,12 @@ bool track(lat_type &lat, double *drin, double *&drout, PyObject *rout)
       print_error(elem_index, rout);
       return false;
     }
+
     if (lat.losses)
       check_if_lost(lat, drin, elem_index);
     else
       set_lost(drin, lat.num_particles);
+
     element++;
     integrator++;
     elemdata++;
@@ -655,10 +661,10 @@ PyMODINIT_FUNC PyInit_atpass(void)
   ext_suffix_obj = get_ext_suffix();
   if (ext_suffix_obj == NULL) return NULL;
   ext_suffix =
-    (ext_suffix_obj == Py_None) ? OBJECTEXT : PyUnicode_AsUTF8(ext_suffix_obj);
+    (ext_suffix_obj == Py_None) ? ".so" : PyUnicode_AsUTF8(ext_suffix_obj);
   integ_path = PyUnicode_AsUTF8(integ_path_obj);
   snprintf(integrator_path, sizeof(integrator_path), "%s%s%%s%s", integ_path,
-	   SEPARATOR, ext_suffix);
+	   "/", ext_suffix);
   Py_DECREF(integ_path_obj);
   Py_DECREF(ext_suffix_obj);
 
