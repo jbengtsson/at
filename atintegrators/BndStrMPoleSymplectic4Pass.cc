@@ -6,7 +6,7 @@
  * Created by Xiaobiao Huang, 7/31/2018 */
 
 
-struct elem_type*
+extern "C" struct elem_type*
 trackFunction(const PyObject *ElemData, struct elem_type *Elem, double ps[],
 	      const int num_particles, const struct parameters *Param)
 {

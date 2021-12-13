@@ -1,6 +1,8 @@
 /* Python interface for Tracy-2; compatible with Python 3 only.
    It provides a module 'atpass' containing one method 'atpass'.              */
 
+#include <string>
+
 #include "at_types.h"
 #include "at.h"
 
@@ -70,7 +72,8 @@ static struct LibraryListElement*
 SearchLibraryList(struct LibraryListElement *head, const char *method_name)
 {
   if (head)
-    return (strcmp(head->MethodName, method_name) == 0)?
+    return
+      (strcmp(head->MethodName, method_name) == 0)?
       head : SearchLibraryList(head->Next, method_name);
   else
     return NULL;
@@ -110,7 +113,7 @@ static struct LibraryListElement* get_track_func(const char *fn_name)
      (char*)"trackFunction" };
 
   char
-    lib_file[300],
+    lib_file[300] = "",
     buffer[200];
   track_function
     fn_handle = NULL;
@@ -125,6 +128,8 @@ static struct LibraryListElement* get_track_func(const char *fn_name)
     if (dl_handle)
       fn_handle = (track_function)dlsym(dl_handle, "trackFunction");
 
+    printf("\nget_track_func:\n  %s\n  %s\n  %p\n  %p\n",
+	   fn_name, lib_file, dl_handle, fn_handle);
     if (fn_handle == NULL) {
       snprintf(buffer, sizeof(buffer),
 	       "PassMethod %s: library, module or trackFunction not found",
@@ -134,20 +139,16 @@ static struct LibraryListElement* get_track_func(const char *fn_name)
       return NULL;
     }
 
-    LibraryListPtr =
+    LibraryListPtr                 =
       static_cast<struct LibraryListElement*>
       (malloc(sizeof(struct LibraryListElement)));
-    LibraryListPtr->MethodName =
+    LibraryListPtr->MethodName     =
       strcpy(static_cast<char*>(malloc(strlen(fn_name)+1)), fn_name);
-    LibraryListPtr->LibraryHandle = dl_handle;
+    LibraryListPtr->LibraryHandle  = dl_handle;
     LibraryListPtr->FunctionHandle = fn_handle;
-    LibraryListPtr->Next = LibraryList;
-    LibraryList = LibraryListPtr;
+    LibraryListPtr->Next           = LibraryList;
+    LibraryList                    = LibraryListPtr;
   }
-  printf("\nget_track_func:\n  %s\n  %s\n  %p\n  %p\n",
-	 lib_file,
-	 LibraryListPtr->MethodName, LibraryListPtr->LibraryHandle,
-	 LibraryListPtr->FunctionHandle);
   return LibraryListPtr;
 }
 

@@ -16,9 +16,9 @@
 #define NUMPY_IMPORT_ARRAY_RETVAL NULL
 #define NUMPY_IMPORT_ARRAY_TYPE void *
 
-#define ATPY_PASS "trackFunction"
-
 #if 0
+
+#define ATPY_PASS "trackFunction"
 
 #if defined(PCWIN) || defined(PCWIN64) || defined(_WIN32)
   #include <windows.h>
