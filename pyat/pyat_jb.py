@@ -135,7 +135,7 @@ def tst_cases(lat):
         lattice = [q]
         ps = numpy.array(numpy.zeros((6)), order='F')
         ps[0] = 1e-6
-        atpass(lat, ps, 1)
+        atpass(lattice, ps, 1)
         prt_vec('\n', ps)
         exit(0)
 
@@ -183,7 +183,7 @@ def tst_cases(lat):
             assert_close(ld2.W, ld6.W, atol=1e-6, rtol=0)
         exit(0)
 
-    if not False:
+    if False:
         lat.radiation_off()
 
         print('\n', lat)
@@ -211,8 +211,7 @@ def tst_cases(lat):
 lat_dir = os.environ['LAT']
 
 lat_names = {
-    # 'dba'       : 'test_matlab/dba.mat',
-    'dba'       : '/Users/johan/git/at/pyat/test_matlab/dba.mat',
+    'dba'       : 'test_matlab/dba.mat',
     'hmba'      : 'test_matlab/hmba.mat',
     'esrf_ebs'  : 'test_matlab/err.mat',
     'bessy-iii' : lat_dir+'/BESSY-III/NoTG-TGRB-B60-6bend-6sx_JB_tracy.lat'

@@ -80,7 +80,7 @@ SearchLibraryList(struct LibraryListElement *head, const char *method_name)
 static struct LibraryListElement* get_track_func(const char *fn_name)
 {
   static char
-    *int_list[] =
+    *int_names[] =
     {(char*)"CorrectorPass",
      (char*)"IdentityPass",
      (char*)"AperturePass",
@@ -92,7 +92,22 @@ static struct LibraryListElement* get_track_func(const char *fn_name)
      (char*)"CavityPass",
      (char*)"GWigSymplecticPass", (char*)"GWigSymplecticRadPass",
      (char*)"Matrix66Pass",
-     (char*)"ExactHamiltonianPass", };
+     (char*)"ExactHamiltonianPass" };
+
+  static char
+    *int_[] =
+    {(char*)"trackFunction",
+     (char*)"trackFunction",
+     (char*)"trackFunction",
+     (char*)"trackFunction",
+     (char*)"trackFunction", (char*)"trackFunction",
+     (char*)"trackFunction", (char*)"trackFunction",
+     (char*)"trackFunction",
+     (char*)"trackFunction",
+     (char*)"trackFunction",
+     (char*)"trackFunction", (char*)"trackFunction",
+     (char*)"trackFunction",
+     (char*)"trackFunction" };
 
   char
     lib_file[300],
@@ -101,8 +116,6 @@ static struct LibraryListElement* get_track_func(const char *fn_name)
     fn_handle = NULL;
   LIBRARYHANDLETYPE
     dl_handle = NULL;
-  PyObject
-    *pyfunction = NULL;
   struct LibraryListElement
     *LibraryListPtr = SearchLibraryList(LibraryList, fn_name);
 
@@ -112,23 +125,18 @@ static struct LibraryListElement* get_track_func(const char *fn_name)
     dl_handle = LOADLIBFCN(lib_file);
     if (dl_handle) fn_handle = (track_function)GETTRACKFCN(dl_handle);
 
-    if ((fn_handle == NULL) && (pyfunction == NULL)) {
+    if (fn_handle == NULL) {
       snprintf(buffer, sizeof(buffer),
 	       "PassMethod %s: library, module or trackFunction not found",
 	       fn_name);
       if (dl_handle) FREELIBFCN(dl_handle);
-      if (pyfunction) Py_DECREF(pyfunction);
       PyErr_SetString(PyExc_RuntimeError, buffer);
       return NULL;
     }
 
     LibraryListPtr =
-      // (struct LibraryListElement *)
-      // malloc(sizeof(struct LibraryListElement));
       static_cast<struct LibraryListElement*>
       (malloc(sizeof(struct LibraryListElement)));
-    // LibraryListPtr->MethodName =
-    //   strcpy(malloc(strlen(fn_name)+1), fn_name);
     LibraryListPtr->MethodName =
       strcpy(static_cast<char*>(malloc(strlen(fn_name)+1)), fn_name);
     LibraryListPtr->LibraryHandle = dl_handle;
@@ -139,29 +147,7 @@ static struct LibraryListElement* get_track_func(const char *fn_name)
   return LibraryListPtr;
 }
 
-/* Build input positional arguments for python integrators */
-static PyObject* Buildkwargs(const PyObject *ElemData)
-{
-  PyObject *kwargs;
-
-  kwargs = PyDict_New();
-  PyDict_SetItemString(kwargs, (char *)"elem", (PyObject *)ElemData);
-  return kwargs;
-}
-
-/* Build input keyword arguments for python integrators */
-static PyObject* Buildargs(double *r_in, const int num_particles)
-{
-  npy_intp outdims[1];
-  PyObject *rin;
-
-  outdims[0] = PS_DIM*num_particles;
-  rin = PyArray_SimpleNewFromData(1, outdims, NPY_DOUBLE, r_in);
-  if (!rin) printf("PyFuncPass: could not generate pyArray rin");
-  return PyTuple_Pack(1, rin);
-}
-
-bool get_input(PyObject *&args, PyArrayObject *&rin, PyObject *&element)
+bool get_at_lat(PyObject *&args, PyArrayObject *&rin, PyObject *&element)
 {
   if (!PyArg_ParseTuple(args, "OO!", &element, &PyArray_Type, &rin)) {
     return false;
@@ -191,7 +177,7 @@ static PyObject *at_elempass(PyObject *self, PyObject *args)
   struct parameters         param;
   struct LibraryListElement *LibraryListPtr;
 
-  if (!get_input(args, rin, element)) return NULL;
+  if (!get_at_lat(args, rin, element)) return NULL;
 
   num_particles = (PyArray_SIZE(rin)/PS_DIM);
   drin = static_cast<double*>(PyArray_DATA(rin));
@@ -215,10 +201,10 @@ static PyObject *at_elempass(PyObject *self, PyObject *args)
 }
 
 
-bool get_input(PyObject *args, PyObject *kwargs,
-	       PyObject *&lattice, PyArrayObject *&rin, int &num_turns,
-	       PyArrayObject *&refs, npy_uint32 &keep_lattice,
-	       npy_uint32 &omp_num_threads, npy_uint32 &losses)
+bool get_at_lat(PyObject *args, PyObject *kwargs,
+		PyObject *&lattice, PyArrayObject *&rin, int &num_turns,
+		PyArrayObject *&refs, npy_uint32 &keep_lattice,
+		npy_uint32 &omp_num_threads, npy_uint32 &losses)
 {
   static char
     *kwlist[] =
@@ -247,38 +233,15 @@ bool get_input(PyObject *args, PyObject *kwargs,
   return true;
 }
 
-void init_losses(lat_type &lat)
-{
-  unsigned int  i;
-  static double r0[PS_DIM];
-
-  lat.pdims[0] = lat.num_particles;
-  lat.lxdims[0] = PS_DIM;
-  lat.lxdims[1] = lat.num_particles;
-  lat.xnturn = PyArray_EMPTY(1, lat.pdims, NPY_UINT32, 1);
-  lat.xnelem = PyArray_EMPTY(1, lat.pdims, NPY_UINT32, 1);
-  lat.xlost = PyArray_EMPTY(1, lat.pdims, NPY_BOOL, 1);
-  lat.xlostcoord = PyArray_EMPTY(2, lat.lxdims, NPY_DOUBLE, 1);
-  lat.ixnturn = static_cast<int*>(PyArray_DATA((PyArrayObject*)lat.xnturn));
-  lat.ixnelem = static_cast<int*>(PyArray_DATA((PyArrayObject*)lat.xnelem));
-  lat.bxlost = static_cast<bool*>(PyArray_DATA((PyArrayObject*)lat.xlost));
-  lat.dxlostcoord =
-    static_cast<double*>(PyArray_DATA((PyArrayObject*)lat.xlostcoord));
-
-  for(i = 0; i < lat.num_particles; i++) {
-    lat.bxlost[i]  = 0;
-    lat.ixnturn[i] = 0;
-    lat.ixnelem[i] = 0;
-    memcpy(lat.dxlostcoord+PS_DIM*i, r0, PS_DIM*sizeof(double));
-  }
-}
-
 bool get_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
 	     LibraryListElement *&LibraryListPtr)
 {
   npy_uint32     elem_index;
   PyObject       **element;
   track_function *integrator;
+  PyObject       *el;
+  PyObject       *PyPassMethod;
+  double         length;
 
   /* Release the stored elements */
   for (elem_index = 0; elem_index < num_elements; elem_index++) {
@@ -309,9 +272,8 @@ bool get_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
   element = element_list;
   integrator = integrator_list;
   for (elem_index = 0; elem_index < num_elements; elem_index++) {
-    PyObject *el           = PyList_GET_ITEM(lattice, elem_index);
-    PyObject *PyPassMethod = PyObject_GetAttrString(el, "PassMethod");
-    double   length;
+    el           = PyList_GET_ITEM(lattice, elem_index);
+    PyPassMethod = PyObject_GetAttrString(el, "PassMethod");
 
     if (!PyPassMethod) {
       /* No PassMethod */
@@ -340,6 +302,32 @@ bool get_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
     Py_DECREF(PyPassMethod);
   }
   return true;
+}
+
+void init_losses(lat_type &lat)
+{
+  unsigned int  i;
+  static double r0[PS_DIM];
+
+  lat.pdims[0] = lat.num_particles;
+  lat.lxdims[0] = PS_DIM;
+  lat.lxdims[1] = lat.num_particles;
+  lat.xnturn = PyArray_EMPTY(1, lat.pdims, NPY_UINT32, 1);
+  lat.xnelem = PyArray_EMPTY(1, lat.pdims, NPY_UINT32, 1);
+  lat.xlost = PyArray_EMPTY(1, lat.pdims, NPY_BOOL, 1);
+  lat.xlostcoord = PyArray_EMPTY(2, lat.lxdims, NPY_DOUBLE, 1);
+  lat.ixnturn = static_cast<int*>(PyArray_DATA((PyArrayObject*)lat.xnturn));
+  lat.ixnelem = static_cast<int*>(PyArray_DATA((PyArrayObject*)lat.xnelem));
+  lat.bxlost = static_cast<bool*>(PyArray_DATA((PyArrayObject*)lat.xlost));
+  lat.dxlostcoord =
+    static_cast<double*>(PyArray_DATA((PyArrayObject*)lat.xlostcoord));
+
+  for(i = 0; i < lat.num_particles; i++) {
+    lat.bxlost[i]  = 0;
+    lat.ixnturn[i] = 0;
+    lat.ixnelem[i] = 0;
+    memcpy(lat.dxlostcoord+PS_DIM*i, r0, PS_DIM*sizeof(double));
+  }
 }
 
 static void
@@ -509,7 +497,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
   lat.losses          = 0;
   lat.omp_num_threads = 0;
 
-  if (!get_input
+  if (!get_at_lat
       (args, kwargs, lattice, rin, lat.num_turns, refs, lat.keep_lattice,
        lat.omp_num_threads, lat.losses))
     return NULL;
@@ -580,8 +568,6 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
 }
 
 //------------------------------------------------------------------------------
-
-/* Boilerplate to register methods. */
 
 static PyMethodDef AtMethods[] =
   {
