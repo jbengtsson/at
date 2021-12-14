@@ -627,7 +627,7 @@ static PyMethodDef AtMethods[] =
 static PyObject* get_integrators(void) {
   PyObject *at_module, *os_module, *fileobj, *dirname_function, *dirobj;
 
-  at_module = PyImport_ImportModule("at.integrators");
+  at_module = PyImport_ImportModule(home_dir.c_str());
   if (at_module == NULL) return NULL;
   fileobj = PyObject_GetAttrString(at_module, "__file__");
   Py_DECREF(at_module);

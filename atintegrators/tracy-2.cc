@@ -1813,7 +1813,7 @@ void edgey_fringe(double ps[], double inv_rho, double edge_angle, double fint,
 /* Edge focusing in dipoles with fringe field, for vertical only */
 {
   double
-    fx = inv_rho*tan(edge_angle),
+    // fx = inv_rho*tan(edge_angle),
     psi_bar =
     edge_angle-inv_rho*gap*fint*(1+sin(edge_angle)*sin(edge_angle))
     /cos(edge_angle)/(1+ps[4]),
@@ -1965,17 +1965,27 @@ static void edge_fringe2B(double* r, double inv_rho, double edge_angle,
 {
   /* Exit Fringe field transport map to second order in dipoles with fringe
      field                                                                    */
-    double fx = inv_rho*tan(edge_angle);
-    double dpsi =
-      inv_rho*gap*fint*(1+sin(edge_angle)*sin(edge_angle))/cos(edge_angle);
-    /* /(1+r[4]);  */
-    double psi_bar = edge_angle-dpsi;
-    double fy = inv_rho*tan(psi_bar);
-    double h = inv_rho;
-    double tpsi=tan(edge_angle), tpsib=tan(psi_bar);
-    double spsi=1.0/cos(edge_angle); /* spsib=1.0/cos(psi_bar) */
-    double T111, T234, T414, T212, T313, T133, T423, T211, T233, T413;
-    double r0 = r[0], r2 = r[2], r1 = r[1];
+    double
+      fx = inv_rho*tan(edge_angle),
+      dpsi =
+      inv_rho*gap*fint*(1+sin(edge_angle)*sin(edge_angle))/cos(edge_angle),
+      /* /(1+r[4]),  */
+      psi_bar = edge_angle-dpsi,
+      fy      = inv_rho*tan(psi_bar),
+      h       = inv_rho,
+      tpsi    = tan(edge_angle), tpsib=tan(psi_bar),
+      spsi    = 1.0/cos(edge_angle), /* spsib=1.0/cos(psi_bar) */
+      r0      = r[0], r2 = r[2], r1 = r[1],
+      T111,
+      T234,
+      T414,
+      T212,
+      T313,
+      T133,
+      T423,
+      T211,
+      T233,
+      T413;
 
     T111 = 0.5*h*tpsi*tpsi;
     /*  T234=  0.5*h*tpsi*tpsib;    */

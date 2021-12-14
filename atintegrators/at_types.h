@@ -8,5 +8,6 @@
 #define PS_DIM 6
 #define C0     2.99792458e8
 
+const std::string home_dir = "at.integrators";
 
 #endif /*ATTYPES_H*/

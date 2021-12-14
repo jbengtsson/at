@@ -41,7 +41,8 @@ def matfile_generator(params, mat_file):
     key = params.setdefault('mat_key', default_key)
     if key not in m.keys():
         kok = [k for k in m.keys() if '__' not in k]
-        raise AtError('Selected mat_key does not exist, please select in: {}'.format(kok))
+        raise AtError('Selected mat_key does not exist, please select in: {}'
+                      .format(kok))
     check = params.pop('check', True)
     quiet = params.pop('quiet', False)
     cell_array = m[key].flat

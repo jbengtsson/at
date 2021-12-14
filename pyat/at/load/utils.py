@@ -213,11 +213,14 @@ def element_from_dict(elem_dict, index=None, check=True, quiet=False):
         if pass_method is not None:
             pass_to_class = _PASS_MAP.get(pass_method)
             length = float(elem_dict.get('Length', 0.0))
-            file_name = get_pass_method_file_name(pass_method)
-            file_path = os.path.join(integrators.__path__[0], file_name)
-            if not os.path.isfile(os.path.realpath(file_path)):
-                raise err("does not have a {0} file.".format(file_name))
-            elif (pass_method == 'IdentityPass') and (length != 0.0):
+            # J.B. 14/12/21: Remove check for file name.
+            # file_name = get_pass_method_file_name(pass_method)
+            # file_path = os.path.join(integrators.__path__[0], file_name)
+            # if not os.path.isfile(os.path.realpath(file_path)):
+            #     raise err("does not have a {0} file.".format(file_name))
+            # elif (pass_method == 'IdentityPass') and (length != 0.0):
+            #     raise err("is not compatible with length {0}.", length)
+            if (pass_method == 'IdentityPass') and (length != 0.0):
                 raise err("is not compatible with length {0}.", length)
             elif pass_to_class is not None:
                 if not issubclass(cls, pass_to_class):

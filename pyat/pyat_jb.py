@@ -217,9 +217,9 @@ lat_names = {
     'bessy-iii' : lat_dir+'/BESSY-III/NoTG-TGRB-B60-6bend-6sx_JB_tracy.lat'
 }
 
-# lat_name = 'dba'
+lat_name = 'dba'
 # lat_name = 'hmba'
-lat_name = 'bessy-iii'
+# lat_name = 'bessy-iii'
 if lat_name != 'bessy-iii':
     lat = at.load_mat(lat_names[lat_name])
 else:
@@ -234,7 +234,7 @@ if False:
 
 lat.radiation_off()
 
-if False:
+if not False:
     tst_cases(lat)
     exit(0)
 
