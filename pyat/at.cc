@@ -2,6 +2,7 @@
    It provides a module 'atpass' containing one method 'atpass'.              */
 
 #include <string>
+#include <sstream>
 
 #include "at_types.h"
 #include "at.h"
@@ -86,6 +87,8 @@ SearchLibraryList(struct LibraryListElement *head,
     return NULL;
 }
 
+#include "integrator_helper.cc"
+
 /* Find the correct track function by name. */
 static struct LibraryListElement* get_track_func(const std::string &fn_name)
 {
@@ -106,54 +109,41 @@ static struct LibraryListElement* get_track_func(const std::string &fn_name)
     lib_file = integrator_path+"/"+"ElemPass"+integrator_lib;
 #endif
 
-    dl_handle = dlopen(lib_file.c_str(), RTLD_LAZY);
-    if (dl_handle) {
-           if (fn_name == "CorrectorPass")
-	fn_handle = (track_function)dlsym(dl_handle, "corr_pass");
-      else if (fn_name == "IdentityPass")
-	fn_handle = (track_function)dlsym(dl_handle, "id_pass");
-      else if (fn_name == "AperturePass")
-	fn_handle = (track_function)dlsym(dl_handle, "aper_pass");
-      else if (fn_name == "DriftPass")
-	fn_handle = (track_function)dlsym(dl_handle, "drift_pass");
-      else if (fn_name == "StrMPoleSymplectic4Pass")
-	fn_handle = (track_function)dlsym(dl_handle, "mpole_pass");
-      else if (fn_name == "StrMPoleSymplectic4RadPass")
-	fn_handle = (track_function)dlsym(dl_handle, "mpole_rad_pass");
-      else if (fn_name == "BndMPoleSymplectic4Pass")
-	fn_handle = (track_function)dlsym(dl_handle, "bend_pass");
-      else if (fn_name == "BndMPoleSymplectic4RadPass")
-	fn_handle = (track_function)dlsym(dl_handle, "bend_rad_pass");
-      else if (fn_name == "BndMPoleSymplectic4E2Pass")
-	fn_handle = (track_function)dlsym(dl_handle, "bend_exact_pass");
-      else if (fn_name == "BndStrMPoleSymplectic4Pass")
-	fn_handle = (track_function)dlsym(dl_handle, "cbend_pass");
-      else if (fn_name == "CavityPass")
-	fn_handle = (track_function)dlsym(dl_handle, "cav_pass");
-      else if (fn_name == "GWigSymplecticPass")
-	fn_handle = (track_function)dlsym(dl_handle, "wig_pass");
-      else if (fn_name == "GWigSymplecticRadPass")
-	fn_handle = (track_function)dlsym(dl_handle, "wig_rad_pass");
-      else if (fn_name == "Matrix66Pass")
-	fn_handle = (track_function)dlsym(dl_handle, "M66_pass");
-      else if (fn_name == "ExactHamiltonianPass")
-	fn_handle = (track_function)dlsym(dl_handle, "H_exact_pass");
-    }
+    /**
+     * I do not understand why they open a dynamic library here ...
+     *
+     *
+     * If in a separate module : import the module and define the Py_API[] ...
+     *
+     * I let the exception propagate if the name is not found ....
+     */
 
-    if (fn_handle == NULL) {
-      buffer =
-	"PassMethod "+fn_name+": library, module or trackFunction not found";
-      if (dl_handle) dlclose(dl_handle);
+    auto cnt = integrators_lookup_table.count(fn_name);
+    switch(cnt){
+    case 1:
+      /* found one name ... fine! */
+      break;
+    case 0:
+      buffer = "PassMethod " + fn_name + ": library, module or trackFunction not found";
       PyErr_SetString(PyExc_RuntimeError, buffer.c_str());
       return NULL;
+
+    default:
+      {
+	std::stringstream msg;
+	msg <<  "Sanity Error: PassMethod " << fn_name << ": found " <<  cnt << " times. Expected only one!";
+	PyErr_SetString(PyExc_RuntimeError, msg.str().c_str());
+      }
+      return NULL;
     }
+
 
     LibraryListPtr                 =
       static_cast<struct LibraryListElement*>
       (malloc(sizeof(struct LibraryListElement)));
     LibraryListPtr->MethodName     = fn_name;
-    LibraryListPtr->LibraryHandle  = dl_handle;
-    LibraryListPtr->FunctionHandle = fn_handle;
+    LibraryListPtr->LibraryHandle  = nullptr;
+    LibraryListPtr->FunctionHandle = integrators_lookup_table[fn_name];
     LibraryListPtr->Next           = LibraryList;
     LibraryList                    = LibraryListPtr;
   }
