@@ -1,0 +1,4 @@
+#ifndef _PyAT_ELEMENT_INTEGRATOR_MACROS_H_
+#define _PyAT_ELEMENT_INTEGRATOR_MACROS_H_ 1
+#define ELEM_PASS_FUNC_NAME(name) name ## _pass
+#endif /* _PyAT_ELEMENT_INTEGRATOR_MACROS_H_ */

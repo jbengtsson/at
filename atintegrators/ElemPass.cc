@@ -1,182 +1,99 @@
 #include "tracy-2.cc"
+#include "element_integrators_macros.h"
+#include "ElemPass.h"
 
-extern "C" struct elem_type*
-corr_pass(const PyObject *ElemData, struct elem_type *Elem, double ps[],
-	  const int num_particles, const struct parameters *Param)
+/*
+ * helpers for automatic initialisation
+ *
+ * these could be avoided by consistent naming
+ */
+static struct elem_type *init_aper(const PyObject *ElemData, struct elem_type *Elem)
 {
-  if (!Elem) Elem = init_corr(ElemData, Elem);
-  if (Elem) {
-    CorrectorPass(ps, num_particles, Elem);
-    return Elem;
-  } else
-    return NULL;
+  /*
+   * why do I need to pass on a zero point:
+   * Santa Claus coming to town?
+   */
+  return init_ap(ElemData, Elem);
 }
 
-extern "C" struct elem_type*
-id_pass(const PyObject *ElemData, struct elem_type *Elem, double ps[],
-	const int num_particles, const struct parameters *Param)
+
+/*
+ * helpers for automatic initialisation
+ *
+ * Can these be avoided by consistent naming ?
+ */
+static struct elem_type * init_mpole_rad(const PyObject *ElemData, struct elem_type *Elem)
 {
-  if (!Elem) Elem = init_id(ElemData, Elem);
-  if (Elem) {
-    IdentityPass(ps, num_particles, Elem);
-    return Elem;
-  } else
-    return NULL;
+  return init_mpole(ElemData, Elem, true, false, true, false);
 }
 
-extern "C" struct elem_type*
-aper_pass(const PyObject *ElemData, struct elem_type *Elem, double ps[],
-	  const int num_particles, const struct parameters *Param)
+static struct elem_type * init_bend(const PyObject *ElemData, struct elem_type *Elem)
 {
-  if (!Elem) Elem = init_ap(ElemData, Elem);
-  if (Elem) {
-    AperturePass(ps, num_particles, Elem);
-    return Elem;
-  } else
-    return NULL;
+  return init_mpole(ElemData, Elem, true, false, false, false);
 }
 
-extern "C" struct elem_type*
-drift_pass(const PyObject *ElemData, struct elem_type *Elem, double ps[],
-	   const int num_particles, const struct parameters *Param)
+static struct elem_type * init_bend_rad(const PyObject *ElemData, struct elem_type *Elem)
 {
-  if (!Elem) Elem = init_drift(ElemData, Elem);
-  if (Elem) {
-    DriftPass(ps, num_particles, Elem);
-    return Elem;
-  } else
-    return NULL;
+  return init_mpole(ElemData, Elem, true, false, true, false);
 }
 
-extern "C" struct elem_type*
-mpole_pass(const PyObject *ElemData, struct elem_type *Elem, double ps[],
-	   const int num_particles, const struct parameters *Param)
+static struct elem_type * init_bend_exact(const PyObject *ElemData, struct elem_type *Elem)
 {
-  if (!Elem) Elem = init_mpole(ElemData, Elem, false, false, false, false);
-  if (Elem) {
-    MpolePass(ps, num_particles, Elem, false);
-    return Elem;
-  } else
-    return NULL;
+  return init_mpole(ElemData, Elem, true, false, false, true);
 }
 
-extern "C" struct elem_type*
-mpole_rad_pass(const PyObject *ElemData, struct elem_type *Elem, double ps[],
-	       const int num_particles, const struct parameters *Param)
+static struct elem_type * init_cbend(const PyObject *ElemData, struct elem_type *Elem)
 {
-  if (!Elem) Elem = init_mpole(ElemData, Elem, false, false, true, false);
-  if (Elem) {
-    MpolePass(ps, num_particles, Elem, true);
-    return Elem;
-  } else
-    return NULL;
+  return init_mpole(ElemData, Elem, true, true, false, false);
 }
 
-extern "C" struct elem_type*
-bend_pass(const PyObject *ElemData, struct elem_type *Elem, double *ps,
-	  const int num_particles, const struct parameters *Param)
+/*
+ * Following lines uses polymorphims.
+ *
+ * Could profit if the called functions could be renamed.
+ * Or one had to stuck the functions listed here in a separate name space
+ */
+static struct elem_type * init_mpole(const PyObject *ElemData, struct elem_type *Elem)
 {
-  if (!Elem) Elem = init_mpole(ElemData, Elem, true, false, false, false);
-  if (Elem) {
-    MpolePass(ps, num_particles, Elem, false);
-    return Elem;
-  } else
-    return NULL;
+    return init_mpole(ElemData, Elem, true, false, false, false);
+}
+static void MpolePassNoRad(double ps[], const int num_particles, struct elem_type *Elem)
+{
+  return MpolePass(ps, num_particles, Elem, false);
 }
 
-extern "C" struct elem_type*
-bend_rad_pass(const PyObject *ElemData, struct elem_type *Elem, double ps[],
-	      const int num_particles, const struct parameters *Param)
+static void MpolePassRad(double ps[], const int num_particles, struct elem_type *Elem)
 {
-  if (!Elem) Elem = init_mpole(ElemData, Elem, true, false, true, false);
-  if (Elem) {
-    MpolePass(ps, num_particles, Elem, true);
-    return Elem;
-  } else
-    return NULL;
+  return MpolePass(ps, num_particles, Elem, true);
+}
+static void MpolePass(double ps[], const int num_particles, struct elem_type *Elem)
+{
+  MpolePassNoRad(ps, num_particles, Elem);
+}
+static struct elem_type * init_wig(const PyObject *ElemData, struct elem_type *Elem)
+{
+  return init_wig(ElemData, Elem, false);
+}
+static struct elem_type * init_wig_rad(const PyObject *ElemData, struct elem_type *Elem)
+{
+  return init_wig(ElemData, Elem, true);
 }
 
-extern "C" struct elem_type*
-bend_exact_pass(const PyObject *ElemData, struct elem_type *Elem,double ps[],
-		const int num_particles, const struct parameters *Param)
+
+
+static struct elem_type * init_H_exact(const PyObject *ElemData, struct elem_type *Elem)
 {
-  if (!Elem) Elem = init_mpole(ElemData, Elem, true, false, false, true);
-  if (Elem) {
-    MpoleE2Pass(ps, num_particles, Elem);
-    return Elem;
-  } else
-    return NULL;
+  return init_H(ElemData, Elem);
 }
 
-extern "C" struct elem_type*
-cbend_pass(const PyObject *ElemData, struct elem_type *Elem, double ps[],
-	   const int num_particles, const struct parameters *Param)
-{
-  if (!Elem) Elem = init_mpole(ElemData, Elem, true, true, false, false);
-  if (Elem) {
-    CBendPass(ps, num_particles, Elem);
-    return Elem;
-  } else
-    return NULL;
-}
+#undef ELEM_PASS
+#define ELEM_INIT_FUNC_NAME(name) init_ ## name
 
-extern "C" struct elem_type*
-cav_pass(const PyObject *ElemData, struct elem_type *Elem, double *ps,
-	 const int num_particles, const struct parameters *Param)
-{
-  if (!Elem) Elem = init_cav(ElemData, Elem);
-  if (Elem) {
-    CavityPass(ps, num_particles, Elem);
-    return Elem;
-  } else
-    return NULL;
-}
-
-extern "C" struct elem_type*
-wig_pass(const PyObject *ElemData, struct elem_type *Elem, double ps[],
-	 const int num_particles, const struct parameters *Param)
-{
-  if (!Elem) Elem = init_wig(ElemData, Elem, false);
-  if (Elem) {
-    WigPass(ps, num_particles, Elem);
-    return Elem;
-  } else
-    return NULL;
-}
-
-extern "C" struct elem_type*
-wig_rad_pass(const PyObject *ElemData, struct elem_type *Elem, double ps[],
-	     const int num_particles, const struct parameters *Param)
-
-{
-  if (!Elem) Elem = init_wig(ElemData, Elem, true);
-  if (Elem) {
-    WigRadPass(ps, num_particles, Elem);
-    return Elem;
-  } else
-    return NULL;
-}
-
-extern "C" struct elem_type*
-M66_pass(const PyObject *ElemData,	struct elem_type *Elem, double ps[],
-	 const int num_particles, const struct parameters *Param)
-{
-  if (!Elem) Elem = init_M66(ElemData, Elem);
-  if (Elem) {
-    Matrix66Pass(ps, num_particles, Elem);
-    return Elem;
-  } else
-    return NULL;
-}
-
-extern "C" struct elem_type*
-H_exact_pass(const PyObject *ElemData, struct elem_type *Elem, double ps[],
-	     const int num_particles, const struct parameters *Param)
-{
-  if (!Elem) Elem = init_H(ElemData, Elem);
-  if (Elem) {
-    HamPass(ps, num_particles, Elem);
-    return Elem;
-  } else
-    return NULL;
-}
+#define ELEM_PASS(name, pass_name, api_identifier)   	          \
+  FUNCDEFMACRO(name){					          \
+      if(!Elem) Elem = ELEM_INIT_FUNC_NAME(name)(ElemData, Elem); \
+      if(!Elem) return NULL;                                      \
+      pass_name(ps, num_particles, Elem); return Elem;     	  \
+  }
+/* use it here to define the functions themselves */
+#include "element_integrators.h"
