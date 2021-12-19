@@ -109,8 +109,6 @@ static PyObject *at_elempass(PyObject *self, PyObject *args)
   track_function            integrator;
   double                    *drin;
   struct parameters         param;
-  struct LibraryListElement *LibraryListPtr;
-  const char *  str = NULL;
   if (!get_at_lat(args, rin, element)) return NULL;
 
   num_particles = (PyArray_SIZE(rin)/PS_DIM);
@@ -452,8 +450,6 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
     *refs = NULL;
   PyObject
     *rout;
-  struct LibraryListElement
-    *LibraryListPtr;
 
   struct lat_type lat;
 
