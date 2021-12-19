@@ -198,7 +198,7 @@ struct elem_type* init_elem(const PyObject *ElemData, struct elem_type *Elem,
   if(!Elem){
     return NULL;
   }
-  std::cerr << __FUNCTION__ << " allocated Elem " << Elem << std::endl;
+  // std::cerr << __FUNCTION__ << " allocated Elem " << Elem << std::endl;
   if (len) {
     Length = atGetDouble(ElemData, "Length");
     check_error();

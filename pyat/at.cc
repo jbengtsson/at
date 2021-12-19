@@ -359,14 +359,16 @@ bool track(lat_type &lat, double *drin, double *&drout, PyObject *rout)
     /* the actual integrator call */
     {
       track_function t_integrator = * integrator;
+      /*
       std::cerr << "Calling integrator " << (void *) t_integrator
 		<< " Elem " << *elemdata
 		<< " elemdata " << *element
 		<< " prams " << &lat.param
 		<< std::endl;
+      */
     *elemdata =
       t_integrator(*element, *elemdata, drin, lat.num_particles, &lat.param);
-    std::cerr << "Done. returned " << *elemdata << std::endl;
+    // std::cerr << "done. returned " << *elemdata << std::endl;
     }
     /* trackFunction failed */
     if (!*elemdata) {

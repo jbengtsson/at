@@ -1,5 +1,11 @@
 /* no guard macros on purpose */
 /*
+ * List of integrators
+ *
+ * To add a new one:
+ *
+ *      just add a line: the compiler will tell you what's missing
+ *
  * can the marco implementations simplified by a more consistent naming
  * of the internal functions ?
  */

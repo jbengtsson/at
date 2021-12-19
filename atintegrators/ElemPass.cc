@@ -86,22 +86,18 @@ static struct elem_type * init_H_exact(const PyObject *ElemData, struct elem_typ
   return init_H(ElemData, Elem);
 }
 
+
 #undef ELEM_PASS
 #define ELEM_INIT_FUNC_NAME(name) init_ ## name
 
-#define ELEM_PASS(name, pass_name, api_identifier)   	                     \
-__BEGIN_DECLS                                                                \
-  FUNCDEFMACRO(name){					                     \
-    std::cerr << "Start: " << __FUNCTION__ << " Elem " << Elem << std::endl; \
-    if(!Elem){ std::cerr <<"Initalising elem to ";                           \
-       Elem = ELEM_INIT_FUNC_NAME(name)(ElemData, Elem);                     \
-       std::cerr << Elem << std::endl;}					     \
-    if(!Elem){ return NULL;};						     \
-      pass_name(ps, num_particles, Elem);                                    \
-      std::cerr << "END: " << __FUNCTION__ << " returning "                  \
-		<< Elem << std::endl;				             \
-      return Elem;						             \
-  }                                                                          \
+#define ELEM_PASS(name, pass_name, api_identifier)                 \
+__BEGIN_DECLS                                                      \
+  FUNCDEFMACRO(name){                                              \
+    if(!Elem){ Elem = ELEM_INIT_FUNC_NAME(name)(ElemData, Elem); } \
+    if(!Elem){ return NULL;};                                      \
+      pass_name(ps, num_particles, Elem);                          \
+      return Elem;                                                 \
+  }                                                                \
 __END_DECLS
 
 /* use it here to define the functions themselves */
