@@ -29,7 +29,7 @@ __BEGIN_DECLS
 
 
 #undef ELEM_PASS
-#define ELEM_PASS(name, pass_name, api_identifier) HEADERMACRO(name)
+#define ELEM_PASS(name, pass_name, api_identifier) HEADERMACRO(name) ;
 /* use it here to make forward declarations for the functions */
 #include "element_integrators.h"
 __END_DECLS

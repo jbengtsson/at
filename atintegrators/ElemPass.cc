@@ -16,7 +16,11 @@ static struct elem_type *init_aper(const PyObject *ElemData, struct elem_type *E
   return init_ap(ElemData, Elem);
 }
 
-
+/*
+   struct elem_type*
+   init_mpole(const PyObject *ElemData, struct elem_type *Elem, const bool bend,
+            	   const bool cbend, const bool incl_E0, const bool incl_E2)
+*/
 /*
  * helpers for automatic initialisation
  *
@@ -24,7 +28,7 @@ static struct elem_type *init_aper(const PyObject *ElemData, struct elem_type *E
  */
 static struct elem_type * init_mpole_rad(const PyObject *ElemData, struct elem_type *Elem)
 {
-  return init_mpole(ElemData, Elem, true, false, true, false);
+  return init_mpole(ElemData, Elem, false, false, true, false);
 }
 
 static struct elem_type * init_bend(const PyObject *ElemData, struct elem_type *Elem)
@@ -55,7 +59,7 @@ static struct elem_type * init_cbend(const PyObject *ElemData, struct elem_type 
  */
 static struct elem_type * init_mpole(const PyObject *ElemData, struct elem_type *Elem)
 {
-    return init_mpole(ElemData, Elem, true, false, false, false);
+    return init_mpole(ElemData, Elem, false, false, false, false);
 }
 static void MpolePassNoRad(double ps[], const int num_particles, struct elem_type *Elem)
 {
@@ -86,14 +90,19 @@ static struct elem_type * init_H_exact(const PyObject *ElemData, struct elem_typ
   return init_H(ElemData, Elem);
 }
 
+
 #undef ELEM_PASS
 #define ELEM_INIT_FUNC_NAME(name) init_ ## name
 
-#define ELEM_PASS(name, pass_name, api_identifier)   	          \
-  FUNCDEFMACRO(name){					          \
-      if(!Elem) Elem = ELEM_INIT_FUNC_NAME(name)(ElemData, Elem); \
-      if(!Elem) return NULL;                                      \
-      pass_name(ps, num_particles, Elem); return Elem;     	  \
-  }
+#define ELEM_PASS(name, pass_name, api_identifier)                 \
+__BEGIN_DECLS                                                      \
+  FUNCDEFMACRO(name){                                              \
+    if(!Elem){ Elem = ELEM_INIT_FUNC_NAME(name)(ElemData, Elem); } \
+    if(!Elem){ return NULL;};                                      \
+      pass_name(ps, num_particles, Elem);                          \
+      return Elem;                                                 \
+  }                                                                \
+__END_DECLS
+
 /* use it here to define the functions themselves */
 #include "element_integrators.h"

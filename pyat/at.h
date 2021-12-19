@@ -5,7 +5,7 @@
 #ifdef _OPENMP
   #include <omp>
 #endif /*_OPENMP*/
-#include <stdbool.h> 
+#include <stdbool.h>
 #include <math.h>
 #include <float.h>
 #include <dlfcn.h>
@@ -44,8 +44,13 @@
 
 #define LIMIT_AMPLITUDE 1
 
-  
+
 /* define the general signature of a pass function */
+/*
+typedef union elem*
+(*track_function)(const PyObject *element, union elem *elemptr,
+		  double *r_in, int num_particles, struct parameters *param);
+*/
 typedef union elem*
 (*track_function)(const PyObject *element, union elem *elemptr,
 		  double *r_in, int num_particles, struct parameters *param);
@@ -55,13 +60,6 @@ struct parameters {
   double RingLength;
   double T0;
 };
-
-static struct LibraryListElement {
-  std::string               MethodName;
-  void                      *LibraryHandle;
-  track_function            FunctionHandle;
-  struct LibraryListElement *Next;
-} *LibraryList = NULL;
 
 struct lat_type {
   bool

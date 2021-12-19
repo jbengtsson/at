@@ -179,21 +179,26 @@ arma::mat arrtomat(const double a[])
 void mattoarr(const arma::mat &A, double a[])
 {
   int j, k;
- 
+
   for (j = 0; j < PS_DIM; j++)
     for (k = 0; k < PS_DIM; k++)
       a[j*PS_DIM+k] = A(j, k);
 }
 
 //------------------------------------------------------------------------------
-
+/*
+ * consider removing elem von argument list
+ */
 struct elem_type* init_elem(const PyObject *ElemData, struct elem_type *Elem,
 			    const bool len, const bool aper)
 {
   double Length, *R1, *R2, *T1, *T2, *EApertures, *RApertures;
 
-  Elem = (struct elem_type*)malloc(sizeof(struct elem_type));
-
+  Elem = (struct elem_type*)calloc(1, sizeof(struct elem_type));
+  if(!Elem){
+    return NULL;
+  }
+  // std::cerr << __FUNCTION__ << " allocated Elem " << Elem << std::endl;
   if (len) {
     Length = atGetDouble(ElemData, "Length");
     check_error();
@@ -241,10 +246,10 @@ struct elem_type* init_ap(const PyObject *ElemData, struct elem_type *Elem)
 {
   double *limits;
 
-  Elem = (struct elem_type*)malloc(sizeof(struct elem_type));
+  Elem = (struct elem_type*)calloc(1, sizeof(struct elem_type));
   Elem->Length = 0e0;
   if (Elem) {
-    Elem->ap_ptr = (struct elem_ap*)malloc(sizeof(struct elem_ap));
+    Elem->ap_ptr = (struct elem_ap*)calloc(1, sizeof(struct elem_ap));
 
     limits = atGetDoubleArray(ElemData, (char*)"Limits");
     check_error();
@@ -259,7 +264,7 @@ struct elem_type* init_drift(const PyObject *ElemData, struct elem_type *Elem)
 {
   Elem = init_elem(ElemData, Elem, true, true);
   if (Elem) {
-    Elem->drift_ptr = (struct elem_drift*)malloc(sizeof(struct elem_drift));
+    Elem->drift_ptr = (struct elem_drift*)calloc(1, sizeof(struct elem_drift));
     return Elem;
   } else
     return NULL;
@@ -270,18 +275,34 @@ init_mpole(const PyObject *ElemData, struct elem_type *Elem, const bool bend,
 	   const bool cbend, const bool incl_E0, const bool incl_E2)
 {
   int
-    MaxOrder, NumIntSteps,  FringeBendEntrance, FringeBendExit,
+    MaxOrder, NumIntSteps,
     FringeQuadEntrance, FringeQuadExit;
   double
-    BendingAngle, EntranceAngle, ExitAngle, FullGap, FringeInt1, FringeInt2,
-    *PolynomA, *PolynomB, *fringeIntM0, *fringeIntP0, *KickAngle, X0ref,
-    ByError, RefDZ, Energy, h1, h2;
+    *PolynomA, *PolynomB, *fringeIntM0, *fringeIntP0, *KickAngle;
+
+
+  double
+    h1 = 0.0,            ///< todo: good default?
+    h2  =0.0,            ///< todo: good default?
+    RefDZ = 0.0,         ///< todo: good default?
+    Energy = 1.9,        ///< todo: good default?
+    ByError = 0.0,       ///< todo: good default?
+    X0ref = 0.0,         ///< todo: good default?
+    FringeInt1 = 0.0,    ///< todo: good default?
+    FringeInt2 = 0.0,    ///< todo: good default?
+    FullGap = 0.0,       ///< todo: good default?
+    EntranceAngle = 0.0, ///< todo: good default?
+    ExitAngle = 0.0,     ///< todo: good default?
+    BendingAngle = 0.0,   ///< todo: good default?
+    FringeBendEntrance = 0.0,  ///< todo: good default?
+    FringeBendExit = 0.0 ///< todo: good default?
+    ;
   elem_mpole
     *mpole;
 
   Elem = init_elem(ElemData, Elem, true, !cbend);
   if (Elem) {
-    Elem->mpole_ptr = (struct elem_mpole*)malloc(sizeof(struct elem_mpole));
+    Elem->mpole_ptr = (struct elem_mpole*)calloc(1, sizeof(struct elem_mpole));
     mpole           = Elem->mpole_ptr;
 
     if (incl_E0) {
@@ -350,10 +371,10 @@ init_mpole(const PyObject *ElemData, struct elem_type *Elem, const bool bend,
     fringeIntP0 =
       atGetOptionalDoubleArray(ElemData,            (char*)"fringeIntP0");
     check_error();
-  
+
     KickAngle = atGetOptionalDoubleArray(ElemData,   (char*)"KickAngle");
     check_error();
-        
+
     if (incl_E0)
       mpole->Energy             = Energy;
 
@@ -672,17 +693,17 @@ static double B2perp(double bx, double by, double irho,
 		     double x, double xpr, double y, double ypr)
 /* Calculates sqr(|e x B|) , where e is a unit vector in the direction of
    velocity                                                                   */
-        
+
 {
   double v_norm2 = 1/(sqr(1+x*irho)+ sqr(xpr) + sqr(ypr));
-    
+
   /* components of the  velocity vector
    * double ex, ey, ez;
    * ex = xpr;
    * ey = ypr;
    * ez = (1+x*irho);
    */
-    
+
   return ((sqr(by*(1+x*irho)) + sqr(bx*(1+x*irho))
 	   + sqr(bx*ypr - by*xpr) )*v_norm2) ;
 }
@@ -889,7 +910,7 @@ void IdentityPass(double ps[], const int num_particles,
 {
   int    k;
   double *ps_vec;
-    
+
   for (k = 0; k < num_particles; k++) {	/*Loop over particles  */
     ps_vec = ps+k*PS_DIM;
     if (!atIsNaN(ps_vec[0])) {
@@ -930,12 +951,12 @@ void AperturePass(double ps[], int num_particles, const struct elem_type *Elem)
 void DriftPass(double *ps, const int num_particles,
 	       const struct elem_type *Elem)
 /* le - physical length
-   ps - 6-by-N matrix of initial conditions reshaped into 
+   ps - 6-by-N matrix of initial conditions reshaped into
    1-d array of 6*N elements                                                  */
 {
   int    k;
   double *ps_vec;
-  
+
 #pragma omp parallel for if (num_particles > OMP_PARTICLE_THRESHOLD*10)    \
   default(shared) shared(ps, num_particles) private(k, ps_vec)
 
@@ -968,7 +989,7 @@ void CorrectorPass(double ps[], const int num_particles,
    1-d array of 6*N elements                                                  */
 {
   int    k;
-  double *ps_vec, xkick, ykick;
+  double  xkick, ykick, *ps_vec = nullptr;
 
   if (Elem->Length == 0e0)
     for(k = 0; k < num_particles; k++) {
@@ -1041,19 +1062,19 @@ static void QuadFringePassP(double ps[], const double b2)
 
   ps[0] += gx;
   r1tmp = 3*u*(2*xz*ps[3]-(x2+z2)*ps[1]);
-   
+
   ps[2] -= gz;
-   
+
   r3tmp = 3*u*(2*xz*ps[1]-(x2+z2)*ps[3]);
   ps[5] -= (gz*ps[3] - gx*ps[1])/(1+ps[4]);
-   
+
   ps[1] += r1tmp;
   ps[3] -= r3tmp;
 }
 
 static void QuadFringePassN(double ps[], const double b2)
 {
-  /* x=ps[0],px=ps[1],y=ps[2],py=ps[3],delta=ps[4],ct=ps[5] 
+  /* x=ps[0],px=ps[1],y=ps[2],py=ps[3],delta=ps[4],ct=ps[5]
      Lee-Whiting's thin lens limit formula as given in p. 390 of "Beam
      Dynamics..."by E. Forest                                                 */
   double u     = b2/(12.0*(1.0+ps[4]));
@@ -1067,12 +1088,12 @@ static void QuadFringePassN(double ps[], const double b2)
 
   ps[0] -= gx;
   r1tmp = 3*u*(2*xz*ps[3]-(x2+z2)*ps[1]);
-   
+
   ps[2] += gz;
-   
+
   r3tmp = 3*u*(2*xz*ps[1]-(x2+z2)*ps[3]);
   ps[5] += (gz*ps[3] - gx*ps[1])/(1+ps[4]);
-   
+
   ps[1] -= r1tmp;
   ps[3] += r3tmp;
 }
@@ -1085,7 +1106,7 @@ static void quadPartialFringeMatrix(double R[6][6], double K1, double inFringe,
   double K1sqr, expJ1x, expJ1y;
 
   R[4][4] = R[5][5] = 1;
-  
+
   K1sqr = K1*K1;
 
   if (part==1) {
@@ -1112,7 +1133,7 @@ static void quadPartialFringeMatrix(double R[6][6], double K1, double inFringe,
   R[0][1] = J2x/expJ1x;
   R[1][0] = expJ1x*J3x;
   R[1][1] = (1 + J2x*J3x)/expJ1x;
-  
+
   expJ1y  = R[2][2] = exp(J1y);
   R[2][3] = J2y/expJ1y;
   R[3][2] = expJ1y*J3y;
@@ -1204,7 +1225,7 @@ void MpolePass(double ps[], const int num_particles,
 
   if (mpole->KickAngle) {
     /* Convert corrector component to polynomial coefficients */
-    mpole->PolynomB[0] -= sin(mpole->KickAngle[0])/Elem->Length; 
+    mpole->PolynomB[0] -= sin(mpole->KickAngle[0])/Elem->Length;
     mpole->PolynomA[0] += sin(mpole->KickAngle[1])/Elem->Length;
   }
 
@@ -1239,7 +1260,7 @@ void MpolePass(double ps[], const int num_particles,
 	     mpole->fringeIntP0);
 	else
 	  QuadFringePassP(ps_vec, mpole->PolynomB[1]);
-      }    
+      }
 
       /* integrator */
       for (m = 0; m < mpole->NumIntSteps; m++) { /* Loop over slices*/
@@ -1344,24 +1365,24 @@ void Matrix66Pass(double ps[], const int num_particles,
    James Rowland 2010
 
    Exact integrator for different element types
- 
+
    This method will work for a drift, a quadrupole, a sextupole or a
    bending magnet. It distinguishes between these using the Class field
    on the element.
 
    The 'ExactHamiltonianPass' method uses the square root hamiltonian in
-   cartesian co-ordinates (see other notes for derivation). 
+   cartesian co-ordinates (see other notes for derivation).
    This is equivalent to setting exact=true in MADX-PTC.
    Multipole fringe fields are also enabled for quadrupoles
-   (fringe = true option in MADX-PTC). 
+   (fringe = true option in MADX-PTC).
 
-   Note that the PolynomB array in the exact cartesian rectangular bend 
-   refers to the normalized straight multipole components of the vector 
-   potential, so PolynomB(1) should be set to 1/rho (B_bend / Brho). 
-   The conjugate momenta in the curvilinear co-ordinate system are not 
-   the same as in the cartesian system so PolynomB(1) must be set back 
-   to zero when using a curvilinear symplectic integrator method such 
-   as the 'BndMPoleSymplectic4E2Pass'. See Forest p362 for a detailed 
+   Note that the PolynomB array in the exact cartesian rectangular bend
+   refers to the normalized straight multipole components of the vector
+   potential, so PolynomB(1) should be set to 1/rho (B_bend / Brho).
+   The conjugate momenta in the curvilinear co-ordinate system are not
+   the same as in the cartesian system so PolynomB(1) must be set back
+   to zero when using a curvilinear symplectic integrator method such
+   as the 'BndMPoleSymplectic4E2Pass'. See Forest p362 for a detailed
    explanation of the vector potential in curvilinear co-ordinates.           */
 
 #undef DEBUG_MODE
@@ -1406,27 +1427,27 @@ void mpole_fringe(T *x, const int type, const double LR, const double *F,
   // not re-derived and checked
   // note this is the sum over n of Forest 13.29
   // one for each multipole component
-    
+
   T
-    I, U, V, DU, DV, DUX, DVX, DUY, DVY, 
-    FX, FY, FX_X, FX_Y, FY_X, FY_Y, 
+    I, U, V, DU, DV, DUX, DVX, DUY, DVY,
+    FX, FY, FX_X, FX_Y, FY_X, FY_Y,
     RX, IX, DRX, DIX;
-    
+
   if (edge == 0)
     I = 1;
   else
     I = -1;
-    
+
   FX   = 0;
   FY   = 0;
   FX_X = 0;
   FX_Y = 0;
   FY_X = 0;
   FY_Y = 0;
-    
+
   RX   = 1.0;
   IX   = 0.0;
-    
+
   // invariant is (j is the index, i is the complex unit)
   // RX+IXi = (x + iy)^j
   for(int n = 0; n < nF; n++) {
@@ -1441,7 +1462,7 @@ void mpole_fringe(T *x, const int type, const double LR, const double *F,
     // complex muls
     RX = DRX * x[x_] - DIX * x[y_];
     IX = DRX * x[y_] + DIX * x[x_];
-        
+
     if(j == 1 && type == dipole) {
       U  =         - A * IX;
       V  =         + A * RX;
@@ -1467,7 +1488,7 @@ void mpole_fringe(T *x, const int type, const double LR, const double *F,
     DVY =  j * DU;
 
     double nf = 1.0 * (j + 2) / j;
-        
+
     FX += U * x[x_] + nf * V * x[y_];
     FY += U * x[y_] - nf * V * x[x_];
 
@@ -1514,7 +1535,7 @@ template <typename T> void Yrot(double phi, T * x)
   c = cos(phi);
   s = sin(phi);
   T x1[6] = {x[0], x[1], x[2], x[3], x[4], x[5]};
-  T ps = get_pz(x); 
+  T ps = get_pz(x);
   T p = c*ps - s*x1[px_];
   x[x_] = x1[x_]*ps/p;
   x[px_] = s*ps + c*x1[px_];
@@ -1550,18 +1571,18 @@ void fr4(T *x, const double L, const double *F, const int nF, const int slices)
   for(s = 0; s < slices; s++) {
     for(n = 0; n < INT_ORDER; n++) {
       exact_drift(x, c[n] * ds);
-            
+
       /* multipole summation with horner's rule
 	 scaled field = sum_n (b_n+ia_n) (x+iy)^n */
 
       /* C99 complex numbers don't work in C++
-	 forget the C++ complex class 
+	 forget the C++ complex class
 	 complex double f = F[max_order];
 	 complex double z = x[x_] + x[y_] * I;    */
-            
+
       T fr = F[2*max_order];
       T fi = F[2*max_order+1];
-            
+
       for(i = max_order - 1; i >= 0; i--) {
 	/* complex multiplication
 	   f = f * z + F[i];       */
@@ -1586,7 +1607,7 @@ template<typename T>
 void bend_fringe(T *x, double irho, double gK)
 {
   T dpx, dpy, dd, b0, px, py, pz, g, K, d, phi, xp, yp, yf, xf, lf, pyf;
-    
+
   b0 = irho;
 
   /* gK always multiplied together so put everything in g and set K to one */
@@ -1611,10 +1632,10 @@ void bend_fringe(T *x, double irho, double gK)
   dpx =
     -((b0*(pow(px,2)*pow(pz,4)
 	   *(pow(py,2) - pow(pz,2))
-	   - pow(pz,6)*(pow(py,2) + pow(pz,2)) + 
+	   - pow(pz,6)*(pow(py,2) + pow(pz,2)) +
 	   b0*g*K*px*(pow(pz,2)*pow(pow(py,2) + pow(pz,2),2)
 		      *(2*pow(py,2) + 3*pow(pz,2))
-		      + pow(px,4)*(3*pow(py,2)*pow(pz,2) + 2*pow(pz,4)) + 
+		      + pow(px,4)*(3*pow(py,2)*pow(pz,2) + 2*pow(pz,4)) +
 		      pow(px,2)*(3*pow(py,6)
 				   + 8*pow(py,4)*pow(pz,2)
 				   + 9*pow(py,2)*pow(pz,4)
@@ -1636,7 +1657,7 @@ void bend_fringe(T *x, double irho, double gK)
 	       /pow(pz,3) - atan((px*pz)/(pow(py,2) + pow(pz,2)))),2))/
       (pow(pz,5)*(pow(py,4) + pow(px,2)*pow(pz,2) + 2*pow(py,2)*pow(pz,2)
 		  + pow(pz,4))));
-         
+
   dd =
     (b0*(1 + d)*(px*pow(pz,4)*(pow(py,2) - pow(pz,2)) + b0*g*K*
 		 (-(pow(pz,4)*pow(pow(py,2) + pow(pz,2),2))
@@ -1655,7 +1676,7 @@ void bend_fringe(T *x, double irho, double gK)
   xf = x[x_] + 0.5 * dpx * pow2(yf);
   lf = x[ct_] - 0.5 * dd * pow2(yf);
   pyf = py - phi * yf;
-    
+
   x[y_]  = yf;
   x[x_]  = xf;
   x[py_] = pyf;
@@ -1901,7 +1922,7 @@ void CBendPass(double ps[], const int num_particles, elem_type *Elem)
 //------------------------------------------------------------------------------
 
 /* This code was modified from the original BndMPoleSymplectic4Pass.c of AT
-   to correctly integrate the Hamiltonian in  the curvilinear coordinate 
+   to correctly integrate the Hamiltonian in  the curvilinear coordinate
    system of the dipole and to include the second order Transport map of the
    fringe field. New version created by Xiaobiao Huang in March 2009, in
    final verified version in August 2009.                                     */
@@ -1918,7 +1939,7 @@ static void ATbendhxdrift6(double* r, double L,double h)
   /* (1.0/h+x)*((1.0+hs*px*i1pd/2.)*(1.0+hs*px*i1pd/2.)-(hs*py*i1pd/2.)
      *(hs*py*i1pd/2.))-1./h;*/
   r[1] -= hs*(sqr(px)+sqr(py))*i1pd/2.0;
-	
+
   r[2]+= (1.0+h*x)*i1pd*py*L*(1.+px*hs/2.0);
   r[5]+= (1.0+h*x)*i1pd*i1pd*L/2.0*(sqr(px)+sqr(py));
 }
@@ -1952,12 +1973,12 @@ static void edge_fringe2A(double* r, double inv_rho, double edge_angle,
   T233 = -0.5*h*h1*spsi*spsi*spsi -K1*tpsi+0.5*h*h*tpsi*(tpsib*tpsib+spsi*spsi);
   T413 = -0.5*h*h1*spsi*spsi*spsi -K1*tpsi;
   /*-0.5*h*h*tpsi*(spsi*spsi+tpsib*tpsib);*/
-    
+
   r[0] += T111*r[0]*r[0]+T133*r[2]*r[2];
   r[1] += r0*fx + 2*T212*r0*r[1]+2*T234*r[2]*r[3]+T211*r0*r0+T233*r[2]*r[2] ;
   r[2] += 2*T313*r0*r[2];
   r[3] += -r2*fy + 2*T414*r0*r[3]+2*T413*r0*r2+2*T423*r1*r2 ;
-    
+
 }
 
 static void edge_fringe2B(double* r, double inv_rho, double edge_angle,
@@ -1997,12 +2018,12 @@ static void edge_fringe2B(double* r, double inv_rho, double edge_angle,
     T211 = 0.5*h*h2*spsi*spsi*spsi +K1*tpsi-0.5*h*h*tpsi*tpsi*tpsi;
     T233 = -0.5*h*h2*spsi*spsi*spsi -K1*tpsi-0.5*h*h*tpsi*tpsib*tpsib;
     T413 = -0.5*h*h2*spsi*spsi*spsi -K1*tpsi+0.5*h*h*tpsi*(spsi*spsi);
-    
+
     r[0] += T111*r[0]*r[0]+T133*r[2]*r[2];
     r[1] += r0*fx + 2*T212*r0*r[1]+2*T234*r[2]*r[3]+T211*r0*r0+T233*r[2]*r[2] ;
     r[2] += 2*T313*r0*r[2];
     r[3] += -r2*fy + 2*T414*r0*r[3]+2*T413*r0*r2+2*T423*r1*r2 ;
-    
+
 }
 
 void MpoleE2Pass(double ps[], const int num_particles, elem_type *Elem)
@@ -2010,7 +2031,7 @@ void MpoleE2Pass(double ps[], const int num_particles, elem_type *Elem)
   bool   useT1, useT2, useR1, useR2, useFringe1, useFringe2;
   int    k, m;
   double *ps_vec;
-    
+
   const elem_mpole *mpole = Elem->mpole_ptr;
 
   const double
@@ -2019,7 +2040,7 @@ void MpoleE2Pass(double ps[], const int num_particles, elem_type *Elem)
     L2 = SL*DRIFT2,
     K1 = SL*KICK1,
     K2 = SL*KICK2;
-    
+
   useT1 = (Elem->T1 != NULL);
   useT2 = (Elem->T2 != NULL);
   useR1 = (Elem->R1 != NULL);
@@ -2087,27 +2108,27 @@ void MpoleE2Pass(double ps[], const int num_particles, elem_type *Elem)
 /*----------------------------------------------------------------------------
   Modification Log:
   -----------------
-  .04  2003-04-29      YK Wu, Duke University, wu@fel.duke.edu 
- 		       using scientific notation for constants. 
+  .04  2003-04-29      YK Wu, Duke University, wu@fel.duke.edu
+ 		       using scientific notation for constants.
                        Checked with TRACY pascal code.
                        Computing differential pathlength only.
- 
-  .03  2003-04-28      YK Wu, Duke University, wu@fel.duke.edu 
+
+  .03  2003-04-28      YK Wu, Duke University, wu@fel.duke.edu
  		       Convert to C code and cross-checked with the pascal
 		       version;
- 
+
   .02  2001-12-xx      Y. K. Wu, Duke University, wu@fel.duke.edu
                        Implementing DA version of the wiggler integrator for
 		       Pascal.
                        Gauge is disabled !!! (Dec. 4, 2001)
-   
+
   .01  2001-02-12      Y. K. Wu, LBNL
                        Implementing a generic wiggler integrator
                        for paraxial-ray Hamiltonian approximation.
- 
+
  *----------------------------------------------------------------------------
-   Accelerator Physics Group, Duke FEL Lab, www.fel.duke.edu  
-      
+   Accelerator Physics Group, Duke FEL Lab, www.fel.duke.edu
+
                                                                               */
 double sinc(double x)
 {
@@ -2118,7 +2139,7 @@ double sinc(double x)
   return result;
 }
 
-void GWigAx(struct elem_wig *pWig, double *Xvec, double *pax, double *paxpy) 
+void GWigAx(struct elem_wig *pWig, double *Xvec, double *pax, double *paxpy)
 {
   int    i;
   double x, y, z;
@@ -2131,7 +2152,7 @@ void GWigAx(struct elem_wig *pWig, double *Xvec, double *pax, double *paxpy)
   x = Xvec[0];
   y = Xvec[2];
   z = pWig->Zw;
-  
+
   kw   = 2e0*PI/(pWig->Lw);
   ax   = 0e0;
   axpy = 0e0;
@@ -2178,7 +2199,7 @@ void GWigAx(struct elem_wig *pWig, double *Xvec, double *pax, double *paxpy)
 
     chx = cosh(kx * x);
     cy  = cos(ky * y);
-    axpy = axpy + pWig->VCw[i]*(kw/kz)* pow(ky/kx,2) *chx*cy*sz;      
+    axpy = axpy + pWig->VCw[i]*(kw/kz)* pow(ky/kx,2) *chx*cy*sz;
   }
 
   *pax   = ax;
@@ -2198,7 +2219,7 @@ void GWigAy(struct elem_wig *pWig, double *Xvec, double *pay, double *paypx)
   x = Xvec[0];
   y = Xvec[2];
   z = pWig->Zw;
-    
+
   kw   = 2e0*PI/(pWig->Lw);
   ay   = 0e0;
   aypx = 0e0;
@@ -2206,7 +2227,7 @@ void GWigAy(struct elem_wig *pWig, double *Xvec, double *pay, double *paypx)
   gamma0  = pWig->E0/XMC2;
   beta0   = sqrt(1e0 - 1e0/(gamma0*gamma0));
   pWig->Aw = (q_e/m_e/clight)/(2e0*PI) * (pWig->Lw) * (pWig->PB0);
-     
+
   /* Horizontal Wiggler: note that one potentially could have: kx=0 */
   for ( i = 0; i < pWig->NHharm; i++ ){
     pWig->HCw[i] = (pWig->HCw_raw[i])*(pWig->Aw)/(gamma0*beta0);
@@ -2214,21 +2235,21 @@ void GWigAy(struct elem_wig *pWig, double *Xvec, double *pay, double *paypx)
     ky = pWig->Hky[i];
     kz = pWig->Hkz[i];
     tz = pWig->Htz[i];
-  
+
     sx = sin(kx * x);
     shy = sinh(ky * y);
     sz  = sin(kz * z + tz);
     ay  = ay + (pWig->HCw[i])*(kw/kz)*(kx/ky)*sx*shy*sz;
-  
+
     cx  = cos(kx * x);
     chy = cosh(ky * y);
-    
+
     aypx = aypx + (pWig->HCw[i])*(kw/kz)*pow(kx/ky,2) * cx*chy*sz;
   }
 
   /* Vertical Wiggler: note that one potentially could have: ky=0 */
   for (i = 0; i < pWig->NVharm; i++) {
-    pWig->VCw[i] = (pWig->VCw_raw[i])*(pWig->Aw)/(gamma0*beta0);       
+    pWig->VCw[i] = (pWig->VCw_raw[i])*(pWig->Aw)/(gamma0*beta0);
     kx = pWig->Vkx[i];
     ky = pWig->Vky[i];
     kz = pWig->Vkz[i];
@@ -2259,7 +2280,7 @@ void GWigGauge(struct elem_wig *pWig, double *X, int flag)
 
   GWigAx(pWig, X, &ax, &axpy);
   GWigAy(pWig, X, &ay, &aypx);
- 
+
   if (flag == Elem_Entrance) {
     /* At the entrance of the wiggler */
     X[1] = X[1] + ax;
@@ -2273,10 +2294,10 @@ void GWigGauge(struct elem_wig *pWig, double *X, int flag)
   }
 }
 
-void GWigMap_2nd(struct elem_wig *pWig, double *X, double dl) 
+void GWigMap_2nd(struct elem_wig *pWig, double *X, double dl)
 {
   double dld, dl2, dl2d, ax, ay, axpy, aypx;
-  
+
   dld  = dl/(1.0e0 + X[4]);
   dl2  = 0.5e0 * dl;
   dl2d = dl2/(1.0e0 + X[4]);
@@ -2291,7 +2312,7 @@ void GWigMap_2nd(struct elem_wig *pWig, double *X, double dl)
 
   X[2] = X[2] + dl2d*X[3];
   X[5] = X[5] + 0.5e0*dl2d*(X[3]*X[3])/(1.0e0+X[4]);
-   
+
   GWigAy(pWig, X, &ay, &aypx);
   X[1] = X[1] + aypx;
   X[3] = X[3] + ay;
@@ -2307,7 +2328,7 @@ void GWigMap_2nd(struct elem_wig *pWig, double *X, double dl)
   */
   /* Differential path length only */
   X[5] = X[5] + 0.5e0*dld*(X[1]*X[1])/(1.0e0+X[4]);
-   
+
   GWigAx(pWig, X, &ax, &axpy);
   X[1] = X[1] + ax;
   X[3] = X[3] + axpy;
@@ -2319,17 +2340,17 @@ void GWigMap_2nd(struct elem_wig *pWig, double *X, double dl)
 
   X[2] = X[2] + dl2d*X[3];
   X[5] = X[5] + 0.5e0*dl2d*(X[3]*X[3])/(1.0e0+X[4]);
-   
+
   GWigAy(pWig, X, &ay, &aypx);
   X[1] = X[1] + aypx;
   X[3] = X[3] + ay;
 
   /* Step5: increase a half step in z */
   pWig->Zw = pWig->Zw + dl2;
-  
+
 }
 
-void GWigPass_2nd(struct elem_type *Elem, double X[]) 
+void GWigPass_2nd(struct elem_type *Elem, double X[])
 {
   int      i, Nstep;
   double   dl;
@@ -2343,7 +2364,7 @@ void GWigPass_2nd(struct elem_type *Elem, double X[])
   }
 }
 
-void GWigB(struct elem_wig *pWig, double *Xvec, double *B) 
+void GWigB(struct elem_wig *pWig, double *Xvec, double *B)
 /* Compute magnetic field at particle location.
  * Added by M. Borland, August 2007.
  */
@@ -2356,11 +2377,11 @@ void GWigB(struct elem_wig *pWig, double *Xvec, double *B)
   double cz;
   /* B0 is a reserved symbol on MacOS, defined in termios.h */
   double _B0;
-  
+
   x = Xvec[0];
   y = Xvec[2];
   z = pWig->Zw;
-  
+
   kw   = 2e0*PI/(pWig->Lw);
 
   B[0] = 0;
@@ -2382,7 +2403,7 @@ void GWigB(struct elem_wig *pWig, double *Xvec, double *B)
         chy = cosh(ky * y);
         shy = sinh(ky * y);
         cz = cos(kz*z+tz);
-        
+
         /* Accumulate field values in user-supplied array (Bx, By) */
         B[0] += _B0*pWig->HCw_raw[i]*kx/ky*sx*shy*cz;
         B[1] -= _B0*pWig->HCw_raw[i]*cx*chy*cz;
@@ -2401,13 +2422,13 @@ void GWigB(struct elem_wig *pWig, double *Xvec, double *B)
         cy  = cos(ky * y);
         sy  = sin(ky * y);
         cz  = cos(kz*z+tz);
-        
+
         B[0] -= _B0*pWig->HCw_raw[i]*kx/ky*shx*sy*cz;
         B[1] -= _B0*pWig->HCw_raw[i]*chx*cy*cz;
       }
     }
   }
-  
+
   if (pWig->NVharm && z>=pWig->zStartV && z<=pWig->zEndV) {
     _B0 = pWig->PB0;
     if (!pWig->VSplitPole) {
@@ -2464,7 +2485,7 @@ void GWigRadiationKicks(struct elem_wig *pWig, double *X, double *Bxy,
   B2 = (Bxy[0]*Bxy[0]) + (Bxy[1]*Bxy[1]);
   if (B2==0)
     return;
-  
+
   /* Beam rigidity in T*m */
   H = (pWig->Po)/586.679074042074490;
 
@@ -2473,7 +2494,7 @@ void GWigRadiationKicks(struct elem_wig *pWig, double *X, double *Bxy,
 
   /* (1+delta)^2 */
   dFactor = ((1+X[4])*(1+X[4]));
-  
+
   /* Classical radiation loss */
   dDelta = -(pWig->srCoef)*dFactor*irho2*dl;
   X[4] += dDelta;
@@ -2481,15 +2502,15 @@ void GWigRadiationKicks(struct elem_wig *pWig, double *X, double *Bxy,
   X[3] *= (1+dDelta);
 }
 
-void GWigPass_2nd(struct elem_type *Elem, double X[], const bool rad) 
+void GWigPass_2nd(struct elem_type *Elem, double X[], const bool rad)
 {
   int      i, Nstep;
   double   dl, B[2], ax, ay, axpy, aypx;
   elem_wig *pWig = Elem->wig_ptr;
-  
+
   Nstep = pWig->PN*(pWig->Nw);
   dl    = pWig->Lw/(pWig->PN);
-  
+
   if (rad) {
     GWigAx(pWig, X, &ax, &axpy);
     GWigAy(pWig, X, &ay, &aypx);
@@ -2519,7 +2540,7 @@ void GWigPass_2nd(struct elem_type *Elem, double X[], const bool rad)
 void GWigPass_4th(struct elem_type *Elem, double X[], const bool rad)
 {
   int      i, Nstep;
-  double   dl, dl1, dl0, B[2], ax, ay, axpy, aypx;	
+  double   dl, dl1, dl0, B[2], ax, ay, axpy, aypx;
   elem_wig *pWig = Elem->wig_ptr;
 
   const double
