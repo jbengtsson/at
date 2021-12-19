@@ -3,6 +3,7 @@
 
 #include <string>
 #include <sstream>
+#include <iostream>
 
 #include "at_types.h"
 #include "at.h"
@@ -27,7 +28,7 @@ static std::string
 static PyObject *print_error(int elem_number, PyObject *rout)
 {
   printf("Error in tracking element %d.\n", elem_number);
-  Py_XDECREF(rout);
+  //// Py_XDECREF(rout);
   return NULL;
 }
 
@@ -54,10 +55,10 @@ static PyObject* get_ext_suffix(void)
   if (sysconfig_module == NULL) return NULL;
   get_config_var_fn =
     PyObject_GetAttrString(sysconfig_module, "get_config_var");
-  Py_DECREF(sysconfig_module);
+  //// Py_DECREF(sysconfig_module);
   if (get_config_var_fn == NULL) return NULL;
   ext_suffix = PyObject_CallFunction(get_config_var_fn, "s", "EXT_SUFFIX");
-  Py_DECREF(get_config_var_fn);
+  //// Py_DECREF(get_config_var_fn);
   return ext_suffix;
 }
 
@@ -72,87 +73,17 @@ static PyObject *isopenmp(PyObject *self)
 
 //------------------------------------------------------------------------------
 
-/* Recursively search the list to check if the library containing
-   method_name is already loaded. If it is - return the pointer to the
-   list element. If not, return NULL.                                         */
-static struct LibraryListElement*
-SearchLibraryList(struct LibraryListElement *head,
-		  const std::string &method_name)
-{
-  if (head)
-    return
-      (head->MethodName == method_name)?
-      head : SearchLibraryList(head->Next, method_name);
-  else
-    return NULL;
-}
 
 #include "integrator_helper.cc"
 
-/* Find the correct track function by name. */
-static struct LibraryListElement* get_track_func(const std::string &fn_name)
-{
-  std::string
-    lib_file = "",
-    buffer;
-  track_function
-    fn_handle = NULL;
-  void
-    *dl_handle = NULL;
-  struct LibraryListElement
-    *LibraryListPtr = SearchLibraryList(LibraryList, fn_name);
-
-  if (!LibraryListPtr) {
-#if 0
-    lib_file = integrator_path+"/"+fn_name+integrator_lib;
-#else
-    lib_file = integrator_path+"/"+"ElemPass"+integrator_lib;
-#endif
-
-    /**
-     * I do not understand why they open a dynamic library here ...
-     *
-     *
-     * If in a separate module : import the module and define the Py_API[] ...
-     *
-     * I let the exception propagate if the name is not found ....
-     */
-
-    auto cnt = integrators_lookup_table.count(fn_name);
-    switch(cnt){
-    case 1:
-      /* found one name ... fine! */
-      break;
-    case 0:
-      buffer = "PassMethod " + fn_name + ": library, module or trackFunction not found";
-      PyErr_SetString(PyExc_RuntimeError, buffer.c_str());
-      return NULL;
-
-    default:
-      {
-	std::stringstream msg;
-	msg <<  "Sanity Error: PassMethod " << fn_name << ": found " <<  cnt << " times. Expected only one!";
-	PyErr_SetString(PyExc_RuntimeError, msg.str().c_str());
-      }
-      return NULL;
-    }
-
-
-    LibraryListPtr                 =
-      static_cast<struct LibraryListElement*>
-      (malloc(sizeof(struct LibraryListElement)));
-    LibraryListPtr->MethodName     = fn_name;
-    LibraryListPtr->LibraryHandle  = nullptr;
-    LibraryListPtr->FunctionHandle = integrators_lookup_table[fn_name];
-    LibraryListPtr->Next           = LibraryList;
-    LibraryList                    = LibraryListPtr;
-  }
-  return LibraryListPtr;
-}
 
 bool get_at_lat(PyObject *&args, PyArrayObject *&rin, PyObject *&element)
 {
   if (!PyArg_ParseTuple(args, "OO!", &element, &PyArray_Type, &rin)) {
+    return false;
+  }
+  if (PyArray_NDIM(rin) != 2) {
+    set_error(PyExc_ValueError, "rin is not of two dimensions");
     return false;
   }
   if (PyArray_DIM(rin, 0) != PS_DIM) {
@@ -179,7 +110,7 @@ static PyObject *at_elempass(PyObject *self, PyObject *args)
   double                    *drin;
   struct parameters         param;
   struct LibraryListElement *LibraryListPtr;
-
+  const char *  str = NULL;
   if (!get_at_lat(args, rin, element)) return NULL;
 
   num_particles = (PyArray_SIZE(rin)/PS_DIM);
@@ -191,12 +122,21 @@ static PyObject *at_elempass(PyObject *self, PyObject *args)
 
   PyPassMethod = PyObject_GetAttrString(element, "PassMethod");
   if (!PyPassMethod) return NULL;
-  LibraryListPtr = get_track_func(PyUnicode_AsUTF8(PyPassMethod));
-  Py_DECREF(PyPassMethod);
-  integrator = LibraryListPtr->FunctionHandle;
+
+  std::string  fn_name = PyUnicode_AsUTF8(PyPassMethod);
+  integrator = lookup_function(fn_name);
+  if(!integrator){
+    return NULL;
+  }
+  std::cerr << "Calling integrator method " << fn_name
+	    << " using function " << integrator
+	    << std::endl;
+  std::cerr.flush();
 
   union elem *elem_data =
     integrator(element, NULL, drin, num_particles, &param);
+  std::cerr << " done" << std::endl;
+  std::cerr.flush();
 
   if (!elem_data) return NULL;
   free(elem_data);
@@ -236,12 +176,11 @@ bool get_at_lat(PyObject *args, PyObject *kwargs,
   return true;
 }
 
-bool get_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
-	     LibraryListElement *&LibraryListPtr)
+bool get_lat(PyObject *lattice, double &lattice_length, PyObject *rout)
 {
   npy_uint32     elem_index;
   PyObject       **element;
-  track_function *integrator;
+  track_function *integrator, t_integ;
   PyObject       *el;
   PyObject       *PyPassMethod;
   double         length;
@@ -250,7 +189,7 @@ bool get_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
   for (elem_index = 0; elem_index < num_elements; elem_index++) {
     free(elemdata_list[elem_index]);
     /* Release the stored elements, may be NULL if */
-    Py_XDECREF(element_list[elem_index]);
+    //// Py_XDECREF(element_list[elem_index]);
   }                          /* a previous call was interrupted by an error */
   num_elements = PyList_Size(lattice);
 
@@ -284,8 +223,9 @@ bool get_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
       return false;
     }
 
-    LibraryListPtr = get_track_func(PyUnicode_AsUTF8(PyPassMethod));
-    if (!LibraryListPtr) {
+    std::string fh_name = PyUnicode_AsUTF8(PyPassMethod);
+    t_integ = lookup_function(fh_name);
+    if (!t_integ) {
       /* No trackFunction for the given PassMethod */
       print_error(elem_index, rout);
       return false;
@@ -297,12 +237,16 @@ bool get_lat(PyObject *lattice, double &lattice_length, PyObject *rout,
     else
       lattice_length += length;
 
-    *integrator++ = LibraryListPtr->FunctionHandle;
+    //std::cerr << "Element "<< index << "using  integrator method " << fh_name
+    //	      << " using function " << (void *) t_integ	 << std::endl;
+    //std::cerr.flush();
+
+    *integrator++ = t_integ;
     *element++ = el;
 
     /* Keep a reference to each element in case of reuse */
     Py_INCREF(el);
-    Py_DECREF(PyPassMethod);
+    //// Py_DECREF(PyPassMethod);
   }
   return true;
 }
@@ -413,9 +357,17 @@ bool track(lat_type &lat, double *drin, double *&drout, PyObject *rout)
     }
 
     /* the actual integrator call */
+    {
+      track_function t_integrator = * integrator;
+      std::cerr << "Calling integrator " << (void *) t_integrator
+		<< " Elem " << *elemdata
+		<< " elemdata " << *element
+		<< " prams " << &lat.param
+		<< std::endl;
     *elemdata =
-      (*integrator)(*element, *elemdata, drin, lat.num_particles, &lat.param);
-
+      t_integrator(*element, *elemdata, drin, lat.num_particles, &lat.param);
+    std::cerr << "Done. returned " << *elemdata << std::endl;
+    }
     /* trackFunction failed */
     if (!*elemdata) {
       print_error(elem_index, rout);
@@ -444,19 +396,28 @@ bool track(lat_type &lat, double *drin, double *&drout, PyObject *rout)
 PyObject* get_losses(lat_type &lat, PyObject *rout)
 {
   PyObject
-    *tout = PyTuple_New(2),
-    *dict = PyDict_New();
+    *tout = NULL,
+    *dict =  NULL;
 
+  tout = PyTuple_New(2);
+  if(!tout){
+    return NULL;
+  }
+
+  dict = PyDict_New();
+  if(!dict){
+    return NULL;
+  }
   PyDict_SetItemString(dict, (char *)"islost", (PyObject *)lat.xlost);
   PyDict_SetItemString(dict, (char *)"turn",   (PyObject *)lat.xnturn);
   PyDict_SetItemString(dict, (char *)"elem",   (PyObject *)lat.xnelem);
   PyDict_SetItemString(dict, (char *)"coord",  (PyObject *)lat.xlostcoord);
   PyTuple_SetItem(tout,  0,  rout);
   PyTuple_SetItem(tout,  1,  dict);
-  Py_DECREF(lat.xlost);
-  Py_DECREF(lat.xnturn);
-  Py_DECREF(lat.xnelem);
-  Py_DECREF(lat.xlostcoord);
+  // Py_DECREF(lat.xlost);
+  // Py_DECREF(lat.xnturn);
+  // Py_DECREF(lat.xnelem);
+  // Py_DECREF(lat.xlostcoord);
 
   return tout;
 }
@@ -544,7 +505,7 @@ static PyObject* at_atpass(PyObject *self, PyObject *args, PyObject *kwargs) {
 #endif /*_OPENMP*/
 
   if (!(lat.keep_lattice && valid)) {
-    if (!get_lat(lattice, lattice_length, rout, LibraryListPtr)) return NULL;
+    if (!get_lat(lattice, lattice_length, rout)) return NULL;
     valid = false;
   }
 
@@ -620,16 +581,16 @@ static PyObject* get_integrators(void) {
   at_module = PyImport_ImportModule(home_dir.c_str());
   if (at_module == NULL) return NULL;
   fileobj = PyObject_GetAttrString(at_module, "__file__");
-  Py_DECREF(at_module);
+  //// Py_DECREF(at_module);
   if (fileobj == NULL) return NULL;
   os_module = PyImport_ImportModule("os.path");
   if (os_module == NULL) return NULL;
   dirname_function = PyObject_GetAttrString(os_module, "dirname");
-  Py_DECREF(os_module);
+  //// Py_DECREF(os_module);
   if (dirname_function == NULL) return NULL;
   dirobj = PyObject_CallFunctionObjArgs(dirname_function, fileobj, NULL);
-  Py_DECREF(fileobj);
-  Py_DECREF(dirname_function);
+  //// Py_DECREF(fileobj);
+  //// Py_DECREF(dirname_function);
   return dirobj;
 }
 
@@ -664,8 +625,8 @@ PyMODINIT_FUNC PyInit_atpass(void)
   integ_path = PyUnicode_AsUTF8(integ_path_obj);
   integrator_path = integ_path;
   integrator_lib = ext_suffix;
-  Py_DECREF(integ_path_obj);
-  Py_DECREF(ext_suffix_obj);
+  //// Py_DECREF(integ_path_obj);
+  //// Py_DECREF(ext_suffix_obj);
 
   return m;
 }

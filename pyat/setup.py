@@ -129,35 +129,36 @@ for m in pass_methods:
 print('\n')
 
 
-def integrator_ext(pass_method):
-    name, _ = splitext(basename(pass_method))
-    name = ".".join(('at', 'integrators', name))
-    return Extension(
-        name=name,
-        sources=[pass_method],
-        include_dirs=[numpy.get_include(), integrator_src, diffmatrix_source],
-        define_macros=macros + omp_macros,
-        extra_compile_args=cflags + omp_cflags,
-        extra_link_args=lflags + omp_lflags
-    )
+##def integrator_ext(pass_method):
+##    name, _ = splitext(basename(pass_method))
+##    name = ".".join(('at', 'integrators', name))
+##    return Extension(
+##        name=name,
+##        sources=[pass_method],
+##        include_dirs=[numpy.get_include(), integrator_src, diffmatrix_source],
+##        define_macros=macros + omp_macros,
+##        extra_compile_args=cflags + omp_cflags,
+##        extra_link_args=lflags + omp_lflags
+##    )
 
 
+elem_pass = join(integrator_src, 'ElemPass.cc')
 at = Extension(
     'at.tracking.atpass',
-    sources=[at_source],
+    sources=[elem_pass, at_source, ],
     define_macros=macros + omp_macros,
     include_dirs=[numpy.get_include(), integrator_src, diffmatrix_source],
     extra_compile_args=cflags + omp_cflags,
     extra_link_args=lflags + omp_lflags
 )
 
-diffmatrix = Extension(
-    name='at.physics.diffmatrix',
-    sources=[diffmatrix_method],
-    include_dirs=[numpy.get_include(), integrator_src, diffmatrix_source],
-    define_macros=macros,
-    extra_compile_args=cflags
-)
+#diffmatrix = Extension(
+#    name='at.physics.diffmatrix',
+#    sources=[diffmatrix_method],
+#    include_dirs=[numpy.get_include(), integrator_src, diffmatrix_source],
+#    define_macros=macros,
+#    extra_compile_args=cflags
+#)
 
 setup(
     name='accelerator-toolbox',
@@ -170,7 +171,7 @@ setup(
     # Numpy 1.16.6 is the oldest version that builds with Python 3.9.
     install_requires=['numpy>=1.16.6', 'scipy>=0.16'],
     packages=find_packages(),
-    ext_modules=[at, diffmatrix] + [integrator_ext(pm) for pm in pass_methods],
+    ext_modules=[at], #+ [, diffmatrix, integrator_ext(pm) for pm in pass_methods],
     zip_safe=False,
     python_requires='>=3.6.0',
     classifiers=[
