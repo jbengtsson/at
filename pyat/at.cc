@@ -82,10 +82,12 @@ bool get_at_lat(PyObject *&args, PyArrayObject *&rin, PyObject *&element)
   if (!PyArg_ParseTuple(args, "OO!", &element, &PyArray_Type, &rin)) {
     return false;
   }
+#if 0
   if (PyArray_NDIM(rin) != 2) {
     set_error(PyExc_ValueError, "rin is not of two dimensions");
     return false;
   }
+#endif
   if (PyArray_DIM(rin, 0) != PS_DIM) {
     set_error(PyExc_ValueError, "rin is not 6D");
     return false;
