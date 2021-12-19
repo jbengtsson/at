@@ -416,10 +416,10 @@ PyObject* get_losses(lat_type &lat, PyObject *rout)
   PyDict_SetItemString(dict, (char *)"coord",  (PyObject *)lat.xlostcoord);
   PyTuple_SetItem(tout,  0,  rout);
   PyTuple_SetItem(tout,  1,  dict);
-  // Py_DECREF(lat.xlost);
-  // Py_DECREF(lat.xnturn);
-  // Py_DECREF(lat.xnelem);
-  // Py_DECREF(lat.xlostcoord);
+  Py_DECREF(lat.xlost);
+  Py_DECREF(lat.xnturn);
+  Py_DECREF(lat.xnelem);
+  Py_DECREF(lat.xlostcoord);
 
   return tout;
 }
