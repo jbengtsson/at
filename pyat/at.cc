@@ -28,7 +28,7 @@ static std::string
 static PyObject *print_error(int elem_number, PyObject *rout)
 {
   printf("Error in tracking element %d.\n", elem_number);
-  //// Py_XDECREF(rout);
+  Py_XDECREF(rout);
   return NULL;
 }
 
@@ -55,10 +55,10 @@ static PyObject* get_ext_suffix(void)
   if (sysconfig_module == NULL) return NULL;
   get_config_var_fn =
     PyObject_GetAttrString(sysconfig_module, "get_config_var");
-  //// Py_DECREF(sysconfig_module);
+  Py_DECREF(sysconfig_module);
   if (get_config_var_fn == NULL) return NULL;
   ext_suffix = PyObject_CallFunction(get_config_var_fn, "s", "EXT_SUFFIX");
-  //// Py_DECREF(get_config_var_fn);
+  Py_DECREF(get_config_var_fn);
   return ext_suffix;
 }
 
@@ -189,7 +189,7 @@ bool get_lat(PyObject *lattice, double &lattice_length, PyObject *rout)
   for (elem_index = 0; elem_index < num_elements; elem_index++) {
     free(elemdata_list[elem_index]);
     /* Release the stored elements, may be NULL if */
-    //// Py_XDECREF(element_list[elem_index]);
+    Py_XDECREF(element_list[elem_index]);
   }                          /* a previous call was interrupted by an error */
   num_elements = PyList_Size(lattice);
 
@@ -246,7 +246,7 @@ bool get_lat(PyObject *lattice, double &lattice_length, PyObject *rout)
 
     /* Keep a reference to each element in case of reuse */
     Py_INCREF(el);
-    //// Py_DECREF(PyPassMethod);
+    Py_DECREF(PyPassMethod);
   }
   return true;
 }
@@ -581,16 +581,16 @@ static PyObject* get_integrators(void) {
   at_module = PyImport_ImportModule(home_dir.c_str());
   if (at_module == NULL) return NULL;
   fileobj = PyObject_GetAttrString(at_module, "__file__");
-  //// Py_DECREF(at_module);
+  Py_DECREF(at_module);
   if (fileobj == NULL) return NULL;
   os_module = PyImport_ImportModule("os.path");
   if (os_module == NULL) return NULL;
   dirname_function = PyObject_GetAttrString(os_module, "dirname");
-  //// Py_DECREF(os_module);
+  Py_DECREF(os_module);
   if (dirname_function == NULL) return NULL;
   dirobj = PyObject_CallFunctionObjArgs(dirname_function, fileobj, NULL);
-  //// Py_DECREF(fileobj);
-  //// Py_DECREF(dirname_function);
+  Py_DECREF(fileobj);
+  Py_DECREF(dirname_function);
   return dirobj;
 }
 
@@ -625,8 +625,8 @@ PyMODINIT_FUNC PyInit_atpass(void)
   integ_path = PyUnicode_AsUTF8(integ_path_obj);
   integrator_path = integ_path;
   integrator_lib = ext_suffix;
-  //// Py_DECREF(integ_path_obj);
-  //// Py_DECREF(ext_suffix_obj);
+  Py_DECREF(integ_path_obj);
+  Py_DECREF(ext_suffix_obj);
 
   return m;
 }
